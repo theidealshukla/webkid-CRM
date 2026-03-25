@@ -131,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = useCallback(async (email: string, password: string, name: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      // 1. Create auth user
+      // 1. Create auth user in Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -145,25 +145,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: "Signup failed. Please try again." };
       }
 
-      // 2. Create profile in public.users table
-      const { error: profileError } = await supabase
+      const newAuthId = authData.user.id;
+
+      // 2. Check if a public.users row already exists with this email
+      const { data: existingUser } = await supabase
         .from("users")
-        .insert([{
-          id: authData.user.id,
+        .select("id, name, role")
+        .eq("email", email)
+        .single();
+
+      if (existingUser && existingUser.id !== newAuthId) {
+        // Existing profile found with a different UUID — migrate all FK references
+        const oldId = existingUser.id;
+
+        // Update all foreign key references from old UUID to new auth UUID
+        await Promise.all([
+          supabase.from("leads").update({ assigned_to: newAuthId }).eq("assigned_to", oldId),
+          supabase.from("leads").update({ uploaded_by: newAuthId }).eq("uploaded_by", oldId),
+          supabase.from("activities").update({ user_id: newAuthId }).eq("user_id", oldId),
+          supabase.from("activity_logs").update({ user_id: newAuthId }).eq("user_id", oldId),
+          supabase.from("upload_batches").update({ uploaded_by: newAuthId }).eq("uploaded_by", oldId),
+        ]);
+
+        // Now update the users row itself (delete old, insert new to avoid PK conflict)
+        await supabase.from("users").delete().eq("id", oldId);
+        await supabase.from("users").insert([{
+          id: newAuthId,
           email,
-          name,
-          role: "member",
+          name: name || existingUser.name || "User",
+          role: existingUser.role || "member",
         }]);
 
-      if (profileError) {
-        console.error("Profile creation error:", profileError);
-        // Clean up: sign out the auth user since profile creation failed
-        await supabase.auth.signOut();
-        return { success: false, error: "Failed to create user profile. Please try again." };
-      }
+      } else if (!existingUser) {
+        // No existing profile — create a fresh one
+        const { error: profileError } = await supabase
+          .from("users")
+          .insert([{
+            id: newAuthId,
+            email,
+            name,
+            role: "member",
+          }]);
 
-      // 3. Fetch the newly created profile
-      const profile = await fetchUserProfile(authData.user.id);
+        if (profileError) {
+          console.error("Profile creation error:", profileError);
+          await supabase.auth.signOut();
+          return { success: false, error: "Failed to create user profile. Please try again." };
+        }
+      }
+      // else: existingUser.id === newAuthId — profile already linked correctly, nothing to do
+
+      // 3. Fetch the profile
+      const profile = await fetchUserProfile(newAuthId);
       if (profile) {
         setUser(profile);
         await fetchTeamMembers();
