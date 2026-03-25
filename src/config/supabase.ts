@@ -13,12 +13,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     storageKey: STORAGE_KEY,
     detectSessionInUrl: true,
-  },
-  global: {
-    fetch: (url, options) => {
-      return fetch(url, { ...options, cache: "no-store" });
-    },
-  },
+  }
 });
 
 /**

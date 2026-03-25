@@ -22,16 +22,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const isMounted = useRef(true);
 
-  // Fetch the public.users profile for a given auth user id
+  // Fetch the public.users profile for a given auth user id with timeout protection
   const fetchUserProfile = useCallback(async (authUserId: string): Promise<User | null> => {
     try {
-      const { data, error } = await supabase
+      const queryPromise = supabase
         .from("users")
         .select("*")
         .eq("id", authUserId)
         .single();
+        
+      // 5-second aggressive timeout to prevent infinite UI hanging due to Supabase lock stalls
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error("fetchUserProfile timeout")), 5000)
+      );
 
-      if (error || !data) return null;
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
+
+      if (error || !data) {
+        console.warn("Profile fetch issue:", error?.message || "No data");
+        return null;
+      }
 
       return {
         id: data.id,
@@ -45,13 +55,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Fetch all team members
+  // Fetch all team members with timeout protection
   const fetchTeamMembers = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const queryPromise = supabase
         .from("users")
         .select("*")
         .order("name");
+        
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error("fetchTeamMembers timeout")), 5000)
+      );
+
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
       if (!error && data && isMounted.current) {
         setTeamMembers(
@@ -87,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const profile = await fetchUserProfile(session.user.id);
               if (profile && isMounted.current) {
                 setUser(profile);
-                await fetchTeamMembers();
+                fetchTeamMembers(); // Do not await this, let it load in background
               } else if (isMounted.current && event !== "INITIAL_SESSION") {
                 // Only clear if definitively signed in but no profile exists
                 setUser(null);
@@ -114,7 +130,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 2. Fetch initial session as a fallback guaranteed startup
     const initSession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error("getSession timeout")), 5000)
+        );
+        
+        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]) as any;
         
         if (error) {
            console.warn("getSession error:", error.message);
@@ -126,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const profile = await fetchUserProfile(session.user.id);
             if (profile && isMounted.current) {
               setUser(profile);
-              await fetchTeamMembers();
+              fetchTeamMembers(); // Do not await this, let it load in background
             } else if (isMounted.current) {
               setUser(null);
             }
