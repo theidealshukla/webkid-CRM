@@ -24,26 +24,7 @@ import {
 import { TableRow, TableCell } from "@/components/ui/table";
 import type { Lead, LeadStatus } from "@/types";
 import { ActionDialog } from "@/components/crm/ActionDialog";
-
-const statusConfig: Record<LeadStatus, { bg: string; text: string; label: string }> = {
-  new: { bg: "bg-gray-100", text: "text-gray-700", label: "NEW" },
-  contacted: { bg: "bg-blue-100", text: "text-blue-700", label: "CONTACTED" },
-  interested: { bg: "bg-green-100", text: "text-green-700", label: "INTERESTED" },
-  follow_up: { bg: "bg-yellow-100", text: "text-yellow-800", label: "FOLLOW UP" },
-  not_interested: { bg: "bg-red-100", text: "text-red-700", label: "NOT INTERESTED" },
-  closed_won: { bg: "bg-emerald-100", text: "text-emerald-700", label: "CLOSED WON" },
-  closed_lost: { bg: "bg-red-100", text: "text-red-700", label: "CLOSED LOST" },
-};
-
-const sourceConfig: Record<string, { bg: string; text: string; border: string }> = {
-  manual: { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-100" },
-  excel: { bg: "bg-green-50", text: "text-green-700", border: "border-green-100" },
-  website: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-100" },
-};
-
-const ALL_STATUSES: LeadStatus[] = [
-  "new", "contacted", "interested", "follow_up", "not_interested", "closed_won", "closed_lost",
-];
+import { statusConfig, sourceConfig, ALL_STATUSES } from "@/lib/constants";
 
 interface LeadRowProps {
   lead: Lead;
@@ -68,7 +49,7 @@ const LeadRow = React.memo(function LeadRow({
   }>({ open: false, tab: "note" });
 
   const statusStyle = statusConfig[lead.status] || statusConfig.new;
-  const sourceStyle = sourceConfig[lead.source] || sourceConfig.manual;
+  const srcStyle = sourceConfig[lead.source] || sourceConfig.manual;
 
   return (
     <>
@@ -120,7 +101,7 @@ const LeadRow = React.memo(function LeadRow({
         {/* Source */}
         <TableCell className="w-[9%]">
           <Badge
-            className={`${sourceStyle.bg} ${sourceStyle.text} ${sourceStyle.border} border uppercase text-[10px] tracking-wider font-semibold`}
+            className={`${srcStyle.bg} ${srcStyle.text} ${srcStyle.border} border uppercase text-[10px] tracking-wider font-semibold`}
           >
             {lead.source}
           </Badge>
@@ -152,7 +133,7 @@ const LeadRow = React.memo(function LeadRow({
                     onClick={() => onStatusChange(lead.id, s)}
                     className="gap-2"
                   >
-                    <span className={`h-2 w-2 rounded-full ${cfg.bg}`} />
+                    <span className={`h-2 w-2 rounded-full ${cfg.dot}`} />
                     {cfg.label}
                   </DropdownMenuItem>
                 );
@@ -167,10 +148,10 @@ const LeadRow = React.memo(function LeadRow({
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 focus:outline-none group/assign">
                 <div className="h-6 w-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-semibold">
-                  {lead.assignedTo?.[0]?.toUpperCase() || "?"}
+                  {(lead.assignedToName || lead.assignedTo)?.[0]?.toUpperCase() || "?"}
                 </div>
                 <span className="text-sm text-gray-700 group-hover/assign:text-blue-600 transition-colors">
-                  {lead.assignedTo || "Unassigned"}
+                  {lead.assignedToName || lead.assignedTo || "Unassigned"}
                 </span>
               </button>
             </DropdownMenuTrigger>
@@ -245,12 +226,13 @@ const LeadRow = React.memo(function LeadRow({
     prev.lead.id === next.lead.id &&
     prev.lead.status === next.lead.status &&
     prev.lead.assignedTo === next.lead.assignedTo &&
+    prev.lead.assignedToName === next.lead.assignedToName &&
     prev.lead.lastActivity === next.lead.lastActivity &&
     prev.index === next.index
   );
 });
 
-// Mobile card version
+// Mobile card version — U1 FIX: Added action dropdown + status change dropdown
 const MobileLeadCard = React.memo(function MobileLeadCard({
   lead,
   onStatusChange,
@@ -264,13 +246,13 @@ const MobileLeadCard = React.memo(function MobileLeadCard({
   }>({ open: false, tab: "note" });
 
   const statusStyle = statusConfig[lead.status] || statusConfig.new;
-  const sourceStyle = sourceConfig[lead.source] || sourceConfig.manual;
+  const srcStyle = sourceConfig[lead.source] || sourceConfig.manual;
 
   return (
     <>
       <div className="bg-white rounded-xl border shadow-sm p-4 space-y-3">
         <div className="flex items-start justify-between">
-          <div>
+          <div className="flex-1 min-w-0">
             <Link
               href={`/crm/leads/${lead.id}`}
               className="text-sm font-semibold text-gray-900 hover:text-blue-600"
@@ -279,14 +261,33 @@ const MobileLeadCard = React.memo(function MobileLeadCard({
             </Link>
             <p className="text-xs text-gray-500 mt-0.5">{lead.niche}</p>
           </div>
-          <Badge className={`${statusStyle.bg} ${statusStyle.text} uppercase text-[10px] tracking-wider font-semibold border-0`}>
-            {statusStyle.label}
-          </Badge>
+
+          {/* Status dropdown — now interactive on mobile */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="focus:outline-none ml-2">
+                <Badge className={`${statusStyle.bg} ${statusStyle.text} uppercase text-[10px] tracking-wider font-semibold border-0 cursor-pointer`}>
+                  {statusStyle.label}
+                </Badge>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              {ALL_STATUSES.map((s) => {
+                const cfg = statusConfig[s];
+                return (
+                  <DropdownMenuItem key={s} onClick={() => onStatusChange(lead.id, s)} className="gap-2">
+                    <span className={`h-2 w-2 rounded-full ${cfg.dot}`} />
+                    {cfg.label}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="flex items-center gap-4 text-sm text-gray-600">
           {lead.phone && <span>{lead.phone}</span>}
-          <Badge className={`${sourceStyle.bg} ${sourceStyle.text} ${sourceStyle.border} border uppercase text-[10px]`}>
+          <Badge className={`${srcStyle.bg} ${srcStyle.text} ${srcStyle.border} border uppercase text-[10px]`}>
             {lead.source}
           </Badge>
         </div>
@@ -294,11 +295,39 @@ const MobileLeadCard = React.memo(function MobileLeadCard({
         <div className="flex items-center justify-between pt-2 border-t">
           <div className="flex items-center gap-2">
             <div className="h-6 w-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-semibold">
-              {lead.assignedTo?.[0]?.toUpperCase() || "?"}
+              {(lead.assignedToName || lead.assignedTo)?.[0]?.toUpperCase() || "?"}
             </div>
-            <span className="text-xs text-gray-500">{lead.assignedTo}</span>
+            <span className="text-xs text-gray-500">{lead.assignedToName || lead.assignedTo || "Unassigned"}</span>
           </div>
-          <span className="text-xs text-gray-400">{lead.lastActivity}</span>
+
+          {/* Actions dropdown — U1 FIX */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors">
+                <MoreHorizontal className="h-4 w-4 text-gray-500" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem asChild>
+                <Link href={`/crm/leads/${lead.id}`} className="gap-2">
+                  <Eye className="h-4 w-4" /> View Details
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActionDialog({ open: true, tab: "note" })} className="gap-2">
+                <FileText className="h-4 w-4" /> Add Note
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActionDialog({ open: true, tab: "call" })} className="gap-2">
+                <PhoneCall className="h-4 w-4" /> Log Call
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActionDialog({ open: true, tab: "follow-up" })} className="gap-2">
+                <CalendarPlus className="h-4 w-4" /> Set Follow-up
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onArchive(lead.id)} className="gap-2 text-red-600">
+                <Archive className="h-4 w-4" /> Archive Lead
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

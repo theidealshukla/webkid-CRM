@@ -15,13 +15,8 @@ import {
   Pie,
   Cell,
   Legend,
-  LineChart,
-  Line,
-  Area,
-  AreaChart,
 } from "recharts";
-
-const COLORS = ["#91c5ff", "#3a81f6", "#2563ef", "#1a4eda", "#1f3fad", "#f87171", "#34d399"];
+import { CHART_COLORS, STATUS_LABELS } from "@/lib/constants";
 
 export default function AnalyticsPage() {
   const { leads, activities } = useCRM();
@@ -37,21 +32,12 @@ export default function AnalyticsPage() {
   }, [activeLeads]);
 
   const statusData = useMemo(() => {
-    const labels: Record<string, string> = {
-      new: "New",
-      contacted: "Contacted",
-      interested: "Interested",
-      follow_up: "Follow Up",
-      not_interested: "Not Interested",
-      closed_won: "Closed Won",
-      closed_lost: "Closed Lost",
-    };
     const counts: Record<string, number> = {};
     activeLeads.forEach((l) => {
       counts[l.status] = (counts[l.status] || 0) + 1;
     });
     return Object.entries(counts).map(([status, value]) => ({
-      name: labels[status] || status,
+      name: STATUS_LABELS[status] || status,
       value,
     }));
   }, [activeLeads]);
@@ -64,10 +50,12 @@ export default function AnalyticsPage() {
     return Object.entries(counts).map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value }));
   }, [activeLeads]);
 
+  // C3 FIX: Use assignedToName (human name) instead of assignedTo (UUID)
   const assigneeData = useMemo(() => {
     const counts: Record<string, number> = {};
     activeLeads.forEach((l) => {
-      counts[l.assignedTo || "Unassigned"] = (counts[l.assignedTo || "Unassigned"] || 0) + 1;
+      const name = l.assignedToName || "Unassigned";
+      counts[name] = (counts[name] || 0) + 1;
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [activeLeads]);
@@ -146,7 +134,7 @@ export default function AnalyticsPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={statusData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={2} dataKey="value">
-                    {statusData.map((_, i) => (<Cell key={i} fill={COLORS[i % COLORS.length]} />))}
+                    {statusData.map((_, i) => (<Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />))}
                   </Pie>
                   <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e5e5e5", fontSize: "12px" }} />
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "11px" }} />
@@ -164,7 +152,7 @@ export default function AnalyticsPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={sourceData} cx="50%" cy="50%" outerRadius={90} dataKey="value" label>
-                    {sourceData.map((_, i) => (<Cell key={i} fill={COLORS[i % COLORS.length]} />))}
+                    {sourceData.map((_, i) => (<Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />))}
                   </Pie>
                   <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e5e5e5", fontSize: "12px" }} />
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "11px" }} />

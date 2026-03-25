@@ -145,7 +145,7 @@ export function ExcelUploadModal({ open, onClose }: ExcelUploadModalProps) {
         location: location || "Unknown",
         uploadedAt: new Date().toISOString(),
         leadCount: leads.length,
-        uploadedBy: user?.name || "Unknown",
+        uploadedBy: user?.id || "Unknown",
       });
 
       toast.success(`Successfully imported ${leads.length} leads`);

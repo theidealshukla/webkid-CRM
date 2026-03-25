@@ -2,9 +2,8 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { Search, Plus, Upload, LogOut, User, RefreshCcw } from "lucide-react";
+import { Plus, Upload, LogOut, User, RefreshCcw, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -20,11 +19,10 @@ import { useCRM } from "@/context/CRMContext";
 interface TopbarProps {
   onAddLead: () => void;
   onUploadExcel: () => void;
-  searchTerm: string;
-  onSearchChange: (value: string) => void;
+  onMenuToggle: () => void;
 }
 
-export function Topbar({ onAddLead, onUploadExcel, searchTerm, onSearchChange }: TopbarProps) {
+export function Topbar({ onAddLead, onUploadExcel, onMenuToggle }: TopbarProps) {
   const { user, logout } = useAuth();
   const { refreshData, isLoadingData } = useCRM();
   const router = useRouter();
@@ -42,23 +40,26 @@ export function Topbar({ onAddLead, onUploadExcel, searchTerm, onSearchChange }:
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-white/80 backdrop-blur-sm border-b border-gray-200 flex items-center justify-between px-4 md:px-6">
-      {/* Search */}
-      <div className="relative w-full max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input
-          placeholder="Search leads..."
-          value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-9 bg-gray-50 border-gray-200"
-        />
+      {/* Mobile menu button + Title */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onMenuToggle}
+          className="md:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <h2 className="text-sm font-semibold text-gray-700 md:hidden">Webkid CRM</h2>
       </div>
+
+      {/* Spacer for desktop */}
+      <div className="hidden md:block flex-1" />
 
       {/* Actions */}
       <div className="flex items-center gap-3">
-        <Button 
-          size="sm" 
-          variant="outline" 
-          onClick={refreshData} 
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={refreshData}
           disabled={isLoadingData}
           className="hidden sm:flex"
         >

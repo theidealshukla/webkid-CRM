@@ -26,18 +26,12 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { LeadRow, MobileLeadCard } from "./components/LeadRow";
 import LeadTableSkeleton from "./components/LeadTableSkeleton";
 import EmptyState from "./components/EmptyState";
+import { nicheColors } from "@/lib/constants";
+import { STATUS_LABELS } from "@/lib/constants";
 import type { LeadStatus } from "@/types";
 import { toast } from "sonner";
 
 const ITEMS_PER_PAGE = 50;
-
-const nicheColors: Record<string, string> = {
-  Plumber: "bg-blue-50 border-blue-200 text-blue-800",
-  Electrician: "bg-yellow-50 border-yellow-200 text-yellow-800",
-  Dentist: "bg-green-50 border-green-200 text-green-800",
-  Restaurant: "bg-orange-50 border-orange-200 text-orange-800",
-  default: "bg-gray-50 border-gray-200 text-gray-800",
-};
 
 export default function LeadsPage() {
   const { leads, batches, updateLeadStatus, assignLead, archiveLead, isLoadingData } = useCRM();
@@ -149,7 +143,20 @@ export default function LeadsPage() {
         { header: "Maps Link", key: "mapsLink", width: 30 },
       ];
 
-      filteredLeads.forEach((lead) => ws.addRow(lead));
+      filteredLeads.forEach((lead) => {
+        ws.addRow({
+          businessName: lead.businessName,
+          phone: lead.phone || "",
+          email: lead.email || "",
+          website: lead.website || "",
+          niche: lead.niche || "",
+          status: STATUS_LABELS[lead.status] || lead.status,
+          assignedTo: lead.assignedToName || "Unassigned",
+          source: lead.source || "",
+          address: lead.address || "",
+          mapsLink: lead.mapsLink || "",
+        });
+      });
 
       // Style header
       ws.getRow(1).eachCell((cell) => {
@@ -215,7 +222,7 @@ export default function LeadsPage() {
           <Badge variant="secondary">
             Filtered by batch: {batches.find((b) => b.id === batchFilter)?.fileName}
           </Badge>
-          <Button variant="ghost" size="sm" onClick={() => setBatchFilter(null)}>
+          <Button variant="ghost" size="sm" onClick={() => { setBatchFilter(null); setCurrentPage(1); }}>
             Clear
           </Button>
         </div>

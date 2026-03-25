@@ -1,15 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/context/AuthContext";
-import { User, Mail, Shield } from "lucide-react";
-import { toast } from "sonner";
+import { Shield } from "lucide-react";
 
 export default function SettingsPage() {
   const { user, teamMembers } = useAuth();
@@ -18,7 +14,7 @@ export default function SettingsPage() {
     <div className="space-y-6 animate-fade-in max-w-4xl">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-gray-900">Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage your profile and team</p>
+        <p className="text-sm text-gray-500 mt-1">View your profile and team</p>
       </div>
 
       {/* Profile Card */}

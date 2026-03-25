@@ -86,18 +86,34 @@ export default function FollowUpsPage() {
           </h2>
           <div className="space-y-3">
             {past.map((fu) => (
-              <Card key={fu.id} className="opacity-60">
+              <Card key={fu.id} className="border-red-200 bg-red-50/30">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
-                      <CalendarCheck className="h-5 w-5 text-gray-400" />
+                    <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+                      <CalendarCheck className="h-5 w-5 text-red-500" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{getLeadName(fu.leadId)}</p>
+                      <div className="flex items-center gap-2">
+                        <Link href={`/crm/leads/${fu.leadId}`} className="text-sm font-semibold text-gray-900 hover:text-blue-600">
+                          {getLeadName(fu.leadId)}
+                        </Link>
+                        <Badge variant="destructive" className="text-[10px] uppercase">Overdue</Badge>
+                      </div>
                       <p className="text-sm text-gray-500">{fu.content}</p>
-                      <span className="text-xs text-gray-400">{formatTimeAgo(fu.date)}</span>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-xs text-red-500 font-medium">{formatTimeAgo(fu.date)} ago</span>
+                        <span className="flex items-center gap-1 text-xs text-gray-400">
+                          <User className="h-3 w-3" />
+                          {fu.user}
+                        </span>
+                      </div>
                     </div>
                   </div>
+                  <Link href={`/crm/leads/${fu.leadId}`}>
+                    <Button variant="ghost" size="icon">
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
             ))}

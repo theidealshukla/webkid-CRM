@@ -47,9 +47,9 @@ export function ManualLeadModal({ open, onClose }: ManualLeadModalProps) {
     addLead({
       ...form,
       status: "new",
-      assignedTo: user?.name || "",
+      assignedTo: null,
       source: "manual",
-      uploadedBy: user?.name,
+      uploadedBy: user?.id,
     });
 
     toast.success(`Lead "${form.businessName}" added successfully`);

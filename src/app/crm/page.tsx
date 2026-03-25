@@ -31,24 +31,7 @@ import {
   Legend,
 } from "recharts";
 import DashboardSkeleton from "./components/DashboardSkeleton";
-
-const nicheColors: Record<string, string> = {
-  Plumber: "bg-blue-50 border-blue-200 text-blue-800",
-  Electrician: "bg-yellow-50 border-yellow-200 text-yellow-800",
-  Dentist: "bg-green-50 border-green-200 text-green-800",
-  Restaurant: "bg-orange-50 border-orange-200 text-orange-800",
-  default: "bg-gray-50 border-gray-200 text-gray-800",
-};
-
-const STATUS_COLORS = [
-  "#91c5ff",
-  "#3a81f6",
-  "#2563ef",
-  "#1a4eda",
-  "#1f3fad",
-  "#f87171",
-  "#34d399",
-];
+import { nicheColors, CHART_COLORS, activityBadgeColors, STATUS_LABELS } from "@/lib/constants";
 
 const activityIcons: Record<string, React.ReactNode> = {
   call: <PhoneCall className="h-4 w-4" />,
@@ -57,15 +40,6 @@ const activityIcons: Record<string, React.ReactNode> = {
   system: <Activity className="h-4 w-4" />,
   email: <MessageSquare className="h-4 w-4" />,
   meeting: <Calendar className="h-4 w-4" />,
-};
-
-const activityColors: Record<string, string> = {
-  call: "bg-blue-100 text-blue-600",
-  note: "bg-purple-100 text-purple-600",
-  "follow-up": "bg-yellow-100 text-yellow-600",
-  system: "bg-gray-100 text-gray-600",
-  email: "bg-green-100 text-green-600",
-  meeting: "bg-pink-100 text-pink-600",
 };
 
 export default function DashboardPage() {
@@ -96,21 +70,12 @@ export default function DashboardPage() {
   }, [activeLeads]);
 
   const statusChartData = useMemo(() => {
-    const statusLabels: Record<string, string> = {
-      new: "New",
-      contacted: "Contacted",
-      interested: "Interested",
-      follow_up: "Follow Up",
-      not_interested: "Not Interested",
-      closed_won: "Closed Won",
-      closed_lost: "Closed Lost",
-    };
     const counts: Record<string, number> = {};
     activeLeads.forEach((l) => {
       counts[l.status] = (counts[l.status] || 0) + 1;
     });
     return Object.entries(counts).map(([status, value]) => ({
-      name: statusLabels[status] || status,
+      name: STATUS_LABELS[status] || status,
       value,
     }));
   }, [activeLeads]);
@@ -228,7 +193,7 @@ export default function DashboardPage() {
                     dataKey="value"
                   >
                     {statusChartData.map((_, index) => (
-                      <Cell key={index} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
+                      <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip
@@ -265,7 +230,7 @@ export default function DashboardPage() {
                 const leadName = leads.find((l) => l.id === act.leadId)?.businessName || "Unknown";
                 return (
                   <div key={act.id} className="flex items-start gap-3 animate-slide-in">
-                    <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${activityColors[act.type] || activityColors.system}`}>
+                    <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${activityBadgeColors[act.type] || activityBadgeColors.system}`}>
                       {activityIcons[act.type] || activityIcons.system}
                     </div>
                     <div className="flex-1 min-w-0">

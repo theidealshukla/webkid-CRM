@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,22 +42,9 @@ import {
 } from "lucide-react";
 import { useCRM, formatTimeAgo } from "@/context/CRMContext";
 import { useAuth } from "@/context/AuthContext";
+import { statusConfig, ALL_STATUSES, activityColors } from "@/lib/constants";
 import type { LeadStatus } from "@/types";
 import { toast } from "sonner";
-
-const statusConfig: Record<LeadStatus, { bg: string; text: string; label: string }> = {
-  new: { bg: "bg-gray-100", text: "text-gray-700", label: "NEW" },
-  contacted: { bg: "bg-blue-100", text: "text-blue-700", label: "CONTACTED" },
-  interested: { bg: "bg-green-100", text: "text-green-700", label: "INTERESTED" },
-  follow_up: { bg: "bg-yellow-100", text: "text-yellow-800", label: "FOLLOW UP" },
-  not_interested: { bg: "bg-red-100", text: "text-red-700", label: "NOT INTERESTED" },
-  closed_won: { bg: "bg-emerald-100", text: "text-emerald-700", label: "CLOSED WON" },
-  closed_lost: { bg: "bg-red-100", text: "text-red-700", label: "CLOSED LOST" },
-};
-
-const ALL_STATUSES: LeadStatus[] = [
-  "new", "contacted", "interested", "follow_up", "not_interested", "closed_won", "closed_lost",
-];
 
 const activityIcons: Record<string, React.ReactNode> = {
   call: <PhoneCall className="h-4 w-4" />,
@@ -66,15 +53,6 @@ const activityIcons: Record<string, React.ReactNode> = {
   system: <Activity className="h-4 w-4" />,
   email: <MessageSquare className="h-4 w-4" />,
   meeting: <Calendar className="h-4 w-4" />,
-};
-
-const activityColors: Record<string, string> = {
-  call: "bg-blue-500",
-  note: "bg-purple-500",
-  "follow-up": "bg-yellow-500",
-  system: "bg-gray-400",
-  email: "bg-green-500",
-  meeting: "bg-pink-500",
 };
 
 export default function LeadDetailPage() {
@@ -92,13 +70,27 @@ export default function LeadDetailPage() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
-    phone: lead?.phone || "",
-    email: lead?.email || "",
-    website: lead?.website || "",
-    address: lead?.address || "",
-    niche: lead?.niche || "",
-    rating: lead?.rating?.toString() || "",
+    phone: "",
+    email: "",
+    website: "",
+    address: "",
+    niche: "",
+    rating: "",
   });
+
+  // C2 FIX: Sync editForm when lead changes or when entering edit mode
+  useEffect(() => {
+    if (lead) {
+      setEditForm({
+        phone: lead.phone || "",
+        email: lead.email || "",
+        website: lead.website || "",
+        address: lead.address || "",
+        niche: lead.niche || "",
+        rating: lead.rating?.toString() || "",
+      });
+    }
+  }, [lead]);
 
   const [noteContent, setNoteContent] = useState("");
   const [callOutcome, setCallOutcome] = useState("interested");
@@ -200,7 +192,7 @@ export default function LeadDetailPage() {
             <DropdownMenuContent>
               {ALL_STATUSES.map((s) => (
                 <DropdownMenuItem key={s} onClick={() => updateLeadStatus(leadId, s)}>
-                  <span className={`h-2 w-2 rounded-full ${statusConfig[s].bg} mr-2`} />
+                  <span className={`h-2 w-2 rounded-full ${statusConfig[s].dot} mr-2`} />
                   {statusConfig[s].label}
                 </DropdownMenuItem>
               ))}
@@ -321,12 +313,12 @@ export default function LeadDetailPage() {
               <div className="flex items-center gap-3">
                 <User className="h-4 w-4 text-gray-400" />
                 <span className="text-sm text-gray-500 w-16">Assigned</span>
-                <span className="text-sm font-medium text-gray-900">{lead.assignedTo || "—"}</span>
+                <span className="text-sm font-medium text-gray-900">{lead.assignedToName || "Unassigned"}</span>
               </div>
               <div className="flex items-center gap-3">
                 <User className="h-4 w-4 text-gray-400" />
                 <span className="text-sm text-gray-500 w-16">Added by</span>
-                <span className="text-sm font-medium text-gray-900">{lead.uploadedBy || "—"}</span>
+                <span className="text-sm font-medium text-gray-900">{lead.uploadedByName || "—"}</span>
               </div>
             </CardContent>
           </Card>

@@ -1,43 +1,58 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { ExcelUploadModal } from "@/components/crm/ExcelUploadModal";
 import { ManualLeadModal } from "@/components/crm/ManualLeadModal";
-import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // mobile overlay
   const [showAddLead, setShowAddLead] = useState(false);
   const [showUploadExcel, setShowUploadExcel] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+
+  // Auto-close mobile sidebar on route change (handled by children re-render)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [children]);
+
   return (
     <div className="min-h-screen bg-gray-50/30">
-      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      {/* Mobile overlay backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        mobileOpen={sidebarOpen}
+        onMobileClose={() => setSidebarOpen(false)}
+      />
 
       <div
         className={cn(
           "transition-all duration-300",
-          sidebarCollapsed ? "ml-[68px]" : "ml-64"
+          // Desktop: offset by sidebar width
+          "md:ml-64",
+          sidebarCollapsed && "md:ml-[68px]",
+          // Mobile: no offset (sidebar is overlay)
+          "ml-0"
         )}
       >
         <Topbar
           onAddLead={() => setShowAddLead(true)}
           onUploadExcel={() => setShowUploadExcel(true)}
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
+          onMenuToggle={() => setSidebarOpen(true)}
         />
 
         <main className="p-4 md:p-6">
-          {React.Children.map(children, (child) => {
-            if (React.isValidElement(child)) {
-              return React.cloneElement(child as React.ReactElement<{ searchTerm?: string }>, { searchTerm });
-            }
-            return child;
-          })}
+          {children}
         </main>
       </div>
 

@@ -51,7 +51,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  // Maps for resolving UUIDs to Names
+  // Maps for resolving UUIDs to Names — use refs to avoid re-render loops
   const idToNameMap = React.useMemo(() => {
     const map = new Map<string, string>();
     teamMembers.forEach((m) => map.set(m.id, m.name));
@@ -64,6 +64,10 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     return map;
   }, [teamMembers]);
 
+  // Stable ref for the maps so loadData doesn't re-trigger on team changes
+  const idToNameMapRef = React.useRef(idToNameMap);
+  React.useEffect(() => { idToNameMapRef.current = idToNameMap; }, [idToNameMap]);
+
   // Load all data from Supabase
   const loadData = useCallback(async () => {
     if (!isAuthenticated || !user) {
@@ -72,6 +76,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     }
 
     setIsLoadingData(true);
+    const namesMap = idToNameMapRef.current;
     
     try {
       // Parallel fetch for performance
@@ -89,31 +94,31 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
 
       // Map rows to App interfaces
       const mappedLeads = (leadsRes.data as LeadRow[]).map(r => {
-        const lead = mapLeadRow(r, idToNameMap);
+        const lead = mapLeadRow(r, namesMap);
         
         // Compute lastActivity directly during mapping
         const leadActivities = (activitiesRes.data as ActivityRow[]).filter(a => a.lead_id === r.id);
         if (leadActivities.length > 0) {
-           const latest = leadActivities[0].created_at; // it's already ordered descending
+           const latest = leadActivities[0].created_at;
            lead.lastActivity = formatTimeAgo(latest);
         } else {
            lead.lastActivity = formatTimeAgo(r.created_at);
         }
         
-        // Handling missing is_archived from DB schema gracefully (fallback to false if not present)
-        // @ts-ignore - Assuming user adds is_archived boolean column to leads table
-        lead.isArchived = r.is_archived || false;
+        // Handle is_archived gracefully — column may not exist yet
+        const rawRow = r as unknown as Record<string, unknown>;
+        lead.isArchived = rawRow.is_archived === true;
         
         return lead;
       });
       
-      const mappedActivities = (activitiesRes.data as ActivityRow[]).map(r => mapActivityRow(r, idToNameMap));
-      const mappedBatches = (batchesRes.data as UploadBatchRow[]).map(r => mapBatchRow(r, idToNameMap));
+      const mappedActivities = (activitiesRes.data as ActivityRow[]).map(r => mapActivityRow(r, namesMap));
+      const mappedBatches = (batchesRes.data as UploadBatchRow[]).map(r => mapBatchRow(r, namesMap));
       
       const mappedLogs = (logsRes.data as ActivityLogRow[]).map(r => ({
         id: r.id,
         userId: r.user_id || undefined,
-        user: r.user_id ? idToNameMap.get(r.user_id) || "Unknown" : "System",
+        user: r.user_id ? namesMap.get(r.user_id) || "Unknown" : "System",
         action: r.action,
         entityType: r.entity_type,
         entityId: r.entity_id || undefined,
@@ -133,7 +138,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoadingData(false);
     }
-  }, [isAuthenticated, user, idToNameMap]);
+  }, [isAuthenticated, user]);
 
   // Initial load
   useEffect(() => {
@@ -186,12 +191,10 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         status: lead.status || "new",
         source: lead.source || "manual",
         lead_source_detail: lead.leadSourceDetail || null,
-        assigned_to: lead.assignedTo ? nameToIdMap.get(lead.assignedTo) || null : null,
+        assigned_to: lead.assignedTo ? nameToIdMap.get(lead.assignedTo) || lead.assignedTo || null : null,
         batch_id: lead.batchId || null,
         uploaded_by: user?.id || null,
         manual_notes: lead.manualNotes || null,
-        // @ts-ignore
-        is_archived: lead.isArchived || false // We assume column will be added
       };
 
       const { data, error } = await supabase.from("leads").insert([dbLead]).select().single();
@@ -272,9 +275,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
   const archiveLead = useCallback(async (leadId: string) => {
     try {
       setLeads(prev => prev.map(l => l.id === leadId ? { ...l, isArchived: true } : l));
-      // Assuming user adds is_archived column. If not, this might fail, but it's the expected way
-      // @ts-ignore
-      const { error } = await supabase.from("leads").update({ is_archived: true }).eq("id", leadId);
+      const { error } = await supabase.from("leads").update({ is_archived: true } as Record<string, unknown>).eq("id", leadId);
       if (error) {
         if (error.code === '42703') { // Column does not exist
           toast.error("Database schema missing 'is_archived' boolean column on 'leads' table.");
@@ -292,8 +293,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
   const restoreLead = useCallback(async (leadId: string) => {
     try {
       setLeads(prev => prev.map(l => l.id === leadId ? { ...l, isArchived: false } : l));
-      // @ts-ignore
-      const { error } = await supabase.from("leads").update({ is_archived: false }).eq("id", leadId);
+      const { error } = await supabase.from("leads").update({ is_archived: false } as Record<string, unknown>).eq("id", leadId);
       if (error) throw error;
       addLog("Restored Lead", "lead", leadId);
     } catch (e) {
@@ -427,8 +427,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
   const archiveBatch = useCallback(async (batchId: string) => {
     try {
       setLeads(prev => prev.map(l => l.batchId === batchId ? { ...l, isArchived: true } : l));
-      // @ts-ignore
-      await supabase.from("leads").update({ is_archived: true }).eq("batch_id", batchId);
+      await supabase.from("leads").update({ is_archived: true } as Record<string, unknown>).eq("batch_id", batchId);
       addLog("Archived Batch", "batch", batchId);
     } catch (e) {
       loadData();

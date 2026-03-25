@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -35,9 +36,11 @@ const navItems = [
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  mobileOpen: boolean;
+  onMobileClose: () => void;
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -57,21 +60,34 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     <aside
       className={cn(
         "fixed left-0 top-0 z-40 h-screen bg-white border-r border-gray-200 transition-all duration-300 flex flex-col",
-        collapsed ? "w-[68px]" : "w-64"
+        // Desktop: always visible, width based on collapsed
+        "hidden md:flex",
+        collapsed ? "w-[68px]" : "w-64",
+        // Mobile: slide-in overlay when open
+        mobileOpen && "!flex w-64"
       )}
     >
-      {/* Logo */}
-      <div className="flex items-center h-16 px-4 border-b border-gray-200">
+      {/* Logo + Mobile Close */}
+      <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="h-8 w-8 rounded-lg bg-indigo-950 flex items-center justify-center flex-shrink-0">
             <span className="text-white font-bold text-sm">W</span>
           </div>
-          {!collapsed && (
+          {(!collapsed || mobileOpen) && (
             <span className="font-bold text-lg tracking-tight text-gray-900 whitespace-nowrap" style={{ fontFamily: "'Clash Display', sans-serif" }}>
               Webkid.ai
             </span>
           )}
         </div>
+        {/* Mobile close button */}
+        {mobileOpen && (
+          <button
+            onClick={onMobileClose}
+            className="md:hidden p-1 rounded-lg text-gray-500 hover:bg-gray-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -98,7 +114,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 )}
               >
                 <Icon className="h-5 w-5 flex-shrink-0" />
-                {!collapsed && <span>{item.name}</span>}
+                {(!collapsed || mobileOpen) && <span>{item.name}</span>}
               </a>
             );
           }
@@ -107,6 +123,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <Link
               key={item.name}
               href={item.path}
+              onClick={onMobileClose}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 isActive
@@ -120,7 +137,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   isActive ? "text-indigo-200" : ""
                 )}
               />
-              {!collapsed && <span>{item.name}</span>}
+              {(!collapsed || mobileOpen) && <span>{item.name}</span>}
             </Link>
           );
         })}
@@ -128,7 +145,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* User Profile & Logout */}
       <div className="border-t border-gray-200 p-2">
-        {!collapsed && user && (
+        {(!collapsed || mobileOpen) && user && (
           <div className="flex items-center gap-2.5 px-3 py-2 mb-1">
             <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
               <span className="text-indigo-700 text-xs font-semibold">{initials}</span>
@@ -148,12 +165,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           title="Log out"
         >
           <LogOut className="h-5 w-5 flex-shrink-0" />
-          {!collapsed && <span>Log Out</span>}
+          {(!collapsed || mobileOpen) && <span>Log Out</span>}
         </button>
       </div>
 
-      {/* Collapse Button */}
-      <div className="p-2 border-t border-gray-200">
+      {/* Collapse Button (desktop only) */}
+      <div className="p-2 border-t border-gray-200 hidden md:block">
         <button
           onClick={onToggle}
           className="flex items-center justify-center w-full h-9 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"

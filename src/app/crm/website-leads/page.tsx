@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Globe, Inbox } from "lucide-react";
+import { Globe } from "lucide-react";
 
 export default function WebsiteLeadsPage() {
   return (
