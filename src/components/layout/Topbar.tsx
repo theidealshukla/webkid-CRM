@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, Plus, Upload, LogOut, User } from "lucide-react";
+import { Search, Plus, Upload, LogOut, User, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/AuthContext";
+import { useCRM } from "@/context/CRMContext";
 
 interface TopbarProps {
   onAddLead: () => void;
@@ -24,6 +25,7 @@ interface TopbarProps {
 
 export function Topbar({ onAddLead, onUploadExcel, searchTerm, onSearchChange }: TopbarProps) {
   const { user, logout } = useAuth();
+  const { refreshData, isLoadingData } = useCRM();
 
   const initials = user?.name
     ?.split(" ")
@@ -46,6 +48,15 @@ export function Topbar({ onAddLead, onUploadExcel, searchTerm, onSearchChange }:
 
       {/* Actions */}
       <div className="flex items-center gap-3">
+        <Button 
+          size="sm" 
+          variant="outline" 
+          onClick={refreshData} 
+          disabled={isLoadingData}
+          className="hidden sm:flex"
+        >
+          <RefreshCcw className={`h-4 w-4 ${isLoadingData ? "animate-spin" : ""}`} />
+        </Button>
         <Button size="sm" variant="outline" onClick={onUploadExcel} className="hidden sm:flex gap-2">
           <Upload className="h-4 w-4" />
           Upload Excel

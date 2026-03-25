@@ -23,6 +23,7 @@ interface CRMContextType {
   addActivity: (activity: Omit<Activity, "id">) => void;
   uploadExcelLeads: (leads: Omit<Lead, "id" | "createdAt" | "lastActivity">[], batch: Omit<UploadBatch, "id">) => void;
   archiveBatch: (batchId: string) => void;
+  refreshData: () => Promise<void>;
 }
 
 const CRMContext = createContext<CRMContextType | undefined>(undefined);
@@ -452,6 +453,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         addActivity,
         uploadExcelLeads,
         archiveBatch,
+        refreshData: loadData,
       }}
     >
       {children}
