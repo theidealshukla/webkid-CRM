@@ -8,8 +8,9 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
   teamMembers: User[];
 }
 
@@ -61,13 +62,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const init = async () => {
       try {
-        await fetchTeamMembers(); // Always fetch team members so the CRM can map IDs
-
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           const profile = await fetchUserProfile(session.user.id);
           if (profile) {
             setUser(profile);
+            await fetchTeamMembers();
+          } else {
+            // Auth user exists but no profile row — sign them out
+            await supabase.auth.signOut();
+            setUser(null);
           }
         }
       } catch (e) {
@@ -88,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } else if (event === "SIGNED_OUT") {
           setUser(null);
+          setTeamMembers([]);
         }
       }
     );
@@ -95,35 +100,80 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [fetchUserProfile, fetchTeamMembers]);
 
-  const guestUser = user || teamMembers[0] || {
-    id: "uuid-fallback", // If the DB is fully empty, bypass
-    email: "guest@webkid.ai",
-    name: "Admin (Open)",
-    role: "admin"
-  };
-
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+  const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error || !data.user) {
-        console.error("Login error:", error?.message);
-        return false;
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (!data.user) {
+        return { success: false, error: "Login failed. Please try again." };
       }
 
       const profile = await fetchUserProfile(data.user.id);
       if (profile) {
         setUser(profile);
         await fetchTeamMembers();
-        return true;
+        return { success: true };
       }
-      return false;
-    } catch (e) {
+      
+      return { success: false, error: "No user profile found. Contact your admin." };
+    } catch (e: any) {
       console.error("Login error:", e);
-      return false;
+      return { success: false, error: e.message || "An unexpected error occurred." };
+    }
+  }, [fetchUserProfile, fetchTeamMembers]);
+
+  const signup = useCallback(async (email: string, password: string, name: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      // 1. Create auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (authError) {
+        return { success: false, error: authError.message };
+      }
+
+      if (!authData.user) {
+        return { success: false, error: "Signup failed. Please try again." };
+      }
+
+      // 2. Create profile in public.users table
+      const { error: profileError } = await supabase
+        .from("users")
+        .insert([{
+          id: authData.user.id,
+          email,
+          name,
+          role: "member",
+        }]);
+
+      if (profileError) {
+        console.error("Profile creation error:", profileError);
+        // Clean up: sign out the auth user since profile creation failed
+        await supabase.auth.signOut();
+        return { success: false, error: "Failed to create user profile. Please try again." };
+      }
+
+      // 3. Fetch the newly created profile
+      const profile = await fetchUserProfile(authData.user.id);
+      if (profile) {
+        setUser(profile);
+        await fetchTeamMembers();
+        return { success: true };
+      }
+
+      return { success: false, error: "Profile created but failed to load. Please login." };
+    } catch (e: any) {
+      console.error("Signup error:", e);
+      return { success: false, error: e.message || "An unexpected error occurred." };
     }
   }, [fetchUserProfile, fetchTeamMembers]);
 
@@ -136,10 +186,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        user: guestUser,
-        isAuthenticated: true,
+        user,
+        isAuthenticated: !!user,
         isLoading,
         login,
+        signup,
         logout,
         teamMembers,
       }}

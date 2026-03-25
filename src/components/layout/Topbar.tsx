@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
+import { useRouter } from "next/navigation";
 import { Search, Plus, Upload, LogOut, User, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,12 +27,18 @@ interface TopbarProps {
 export function Topbar({ onAddLead, onUploadExcel, searchTerm, onSearchChange }: TopbarProps) {
   const { user, logout } = useAuth();
   const { refreshData, isLoadingData } = useCRM();
+  const router = useRouter();
 
   const initials = user?.name
     ?.split(" ")
     .map((n) => n[0])
     .join("")
     .toUpperCase() || "U";
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace("/crm/login");
+  };
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-white/80 backdrop-blur-sm border-b border-gray-200 flex items-center justify-between px-4 md:px-6">
@@ -85,12 +92,12 @@ export function Topbar({ onAddLead, onUploadExcel, searchTerm, onSearchChange }:
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => window.location.href = "/crm/settings"}>
+            <DropdownMenuItem onClick={() => router.push("/crm/settings")}>
               <User className="mr-2 h-4 w-4" />
               Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout} className="text-red-600">
+            <DropdownMenuItem onClick={handleLogout} className="text-red-600">
               <LogOut className="mr-2 h-4 w-4" />
               Log Out
             </DropdownMenuItem>

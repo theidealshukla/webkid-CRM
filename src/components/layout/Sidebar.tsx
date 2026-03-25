@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -15,6 +15,7 @@ import {
   Globe,
   ChevronLeft,
   ChevronRight,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -38,7 +39,19 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace("/crm/login");
+  };
+
+  const initials = user?.name
+    ?.split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase() || "U";
 
   return (
     <aside
@@ -112,6 +125,32 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           );
         })}
       </nav>
+
+      {/* User Profile & Logout */}
+      <div className="border-t border-gray-200 p-2">
+        {!collapsed && user && (
+          <div className="flex items-center gap-2.5 px-3 py-2 mb-1">
+            <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+              <span className="text-indigo-700 text-xs font-semibold">{initials}</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-medium text-gray-900 truncate">{user.name}</span>
+              <span className="text-xs text-gray-400 truncate">{user.role}</span>
+            </div>
+          </div>
+        )}
+        <button
+          onClick={handleLogout}
+          className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full",
+            "text-red-600 hover:bg-red-50"
+          )}
+          title="Log out"
+        >
+          <LogOut className="h-5 w-5 flex-shrink-0" />
+          {!collapsed && <span>Log Out</span>}
+        </button>
+      </div>
 
       {/* Collapse Button */}
       <div className="p-2 border-t border-gray-200">
