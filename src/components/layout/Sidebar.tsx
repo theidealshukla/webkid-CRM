@@ -61,22 +61,10 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
     >
       {/* Logo + Mobile Close */}
       <div className="flex items-center justify-between h-16 px-5 border-b border-gray-100 bg-white">
-        <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm"
-            style={{
-              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-              boxShadow: "0 4px 12px rgba(99, 102, 241, 0.3)",
-            }}
-          >
-            <span className="text-white font-bold text-sm">W</span>
+        <div className="flex items-center w-full min-w-0 justify-center pr-2">
+          <div className={`flex items-center justify-center transition-all duration-300 overflow-visible ${(!collapsed || mobileOpen) ? "h-10 w-40" : "h-10 w-full"}`}>
+            <img src="/webkid.svg" alt="Webkid Logo" className={`w-full h-full object-contain drop-shadow-sm ${(!collapsed || mobileOpen) ? "scale-[1.8]" : "scale-[2.5]"}`} />
           </div>
-          {(!collapsed || mobileOpen) && (
-            <span className="font-bold text-lg tracking-tight text-gray-900 whitespace-nowrap" style={{ fontFamily: "'Clash Display', sans-serif" }}>
-              Webkid
-              <span className="text-indigo-600">.ai</span>
-            </span>
-          )}
         </div>
         {/* Mobile close button */}
         {mobileOpen && (

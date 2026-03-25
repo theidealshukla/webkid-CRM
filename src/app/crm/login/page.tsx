@@ -45,9 +45,9 @@ export default function LoginPage() {
         <div className="bg-white rounded-3xl p-8 md:p-10 shadow-xl border border-gray-100">
           
           {/* Brand Logo */}
-          <div className="flex justify-center mb-6">
-            <div className="h-16 w-16 bg-gray-900 rounded-2xl flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-2xl tracking-tight">W</span>
+          <div className="flex justify-center mb-2 overflow-visible">
+            <div className="h-24 w-56 flex items-center justify-center">
+              <img src="/webkid.svg" alt="Webkid Logo" className="w-full h-full object-contain scale-[1.8] drop-shadow-sm" />
             </div>
           </div>
 

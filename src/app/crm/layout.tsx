@@ -28,8 +28,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-5 animate-fade-in p-8 text-center max-w-sm">
-          <div className="h-16 w-16 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-200">
-            <span className="text-white font-bold text-2xl tracking-tighter">W</span>
+          <div className="h-24 w-64 flex items-center justify-center mb-[-0.5rem] overflow-visible">
+            <img src="/webkid.svg" alt="Webkid Logo" className="w-full h-full object-contain scale-[1.8] drop-shadow-sm" />
           </div>
           <div className="space-y-2">
             <h2 className="text-lg font-bold text-gray-900 tracking-tight">Starting your dashboard</h2>
