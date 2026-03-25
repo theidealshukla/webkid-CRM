@@ -68,78 +68,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Check existing session on mount with timeout + corruption protection
+  // Check existing session on mount
   useEffect(() => {
     isMounted.current = true;
     let subscription: { unsubscribe: () => void } | null = null;
+    let hasResolved = false;
 
-    const init = async () => {
-      try {
-        // Use a timeout to prevent getSession() from hanging on corrupt tokens
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("getSession timed out")), 8000)
-        );
-
-        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
-
-        if (session?.user && isMounted.current) {
-          const profile = await fetchUserProfile(session.user.id);
-          if (profile && isMounted.current) {
-            setUser(profile);
-            await fetchTeamMembers();
-          } else if (isMounted.current) {
-            // Auth user exists but no profile row — sign them out
-            await supabase.auth.signOut();
-            setUser(null);
-          }
-        }
-      } catch (e) {
-        console.error("Auth init error:", e);
-        // If session retrieval fails (corrupt token, timeout, etc.), clear storage and recover
-        clearSupabaseAuth();
-        try {
-          await supabase.auth.signOut();
-        } catch {
-          // signOut may also fail if token is corrupt, that's okay
-        }
-        if (isMounted.current) {
-          setUser(null);
-        }
-      }
-
-      if (isMounted.current) {
-        setIsLoading(false);
-      }
-    };
-
-    init();
-
-    // Listen to auth state changes with error protection
+    // 1. Listen to auth state changes immediately to catch events reliably
     try {
       const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
         async (event, session) => {
           if (!isMounted.current) return;
+          console.log(`Auth event: ${event}`);
 
-          if (event === "TOKEN_REFRESHED" && !session) {
-            // Token refresh failed — corrupted session, clear and sign out
-            console.warn("Token refresh failed, clearing auth state");
-            clearSupabaseAuth();
-            setUser(null);
-            setIsLoading(false);
-            return;
-          }
-
-          if (event === "SIGNED_IN" && session?.user) {
-            const profile = await fetchUserProfile(session.user.id);
-            if (profile && isMounted.current) {
-              setUser(profile);
-              await fetchTeamMembers();
+          if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
+            hasResolved = true;
+            if (session?.user) {
+              const profile = await fetchUserProfile(session.user.id);
+              if (profile && isMounted.current) {
+                setUser(profile);
+                await fetchTeamMembers();
+              } else if (isMounted.current && event !== "INITIAL_SESSION") {
+                // Only clear if definitively signed in but no profile exists
+                setUser(null);
+              }
+            } else if (isMounted.current) {
+              setUser(null);
             }
+            if (isMounted.current) setIsLoading(false);
           } else if (event === "SIGNED_OUT") {
+            hasResolved = true;
             if (isMounted.current) {
               setUser(null);
               setTeamMembers([]);
+              setIsLoading(false);
             }
           }
         }
@@ -147,10 +109,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription = sub;
     } catch (e) {
       console.error("Failed to set up auth listener:", e);
-      if (isMounted.current) {
-        setIsLoading(false);
-      }
     }
+
+    // 2. Fetch initial session as a fallback guaranteed startup
+    const initSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+           console.warn("getSession error:", error.message);
+        }
+
+        if (!hasResolved && isMounted.current) {
+          hasResolved = true;
+          if (session?.user) {
+            const profile = await fetchUserProfile(session.user.id);
+            if (profile && isMounted.current) {
+              setUser(profile);
+              await fetchTeamMembers();
+            } else if (isMounted.current) {
+              setUser(null);
+            }
+          } else {
+            setUser(null);
+          }
+          setIsLoading(false);
+        }
+      } catch (e) {
+        console.error("Auth init exception:", e);
+        if (!hasResolved && isMounted.current) {
+          hasResolved = true;
+          setUser(null);
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initSession();
 
     return () => {
       isMounted.current = false;
