@@ -1,8 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import type { User } from "@/types";
-import { supabase } from "@/config/supabase";
+import { supabase, clearSupabaseAuth } from "@/config/supabase";
 
 interface AuthContextType {
   user: User | null;
@@ -20,55 +20,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [teamMembers, setTeamMembers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const isMounted = useRef(true);
 
   // Fetch the public.users profile for a given auth user id
   const fetchUserProfile = useCallback(async (authUserId: string): Promise<User | null> => {
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", authUserId)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", authUserId)
+        .single();
 
-    if (error || !data) return null;
+      if (error || !data) return null;
 
-    return {
-      id: data.id,
-      email: data.email,
-      name: data.name,
-      role: data.role || "member",
-    };
+      return {
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        role: data.role || "member",
+      };
+    } catch (e) {
+      console.error("fetchUserProfile error:", e);
+      return null;
+    }
   }, []);
 
   // Fetch all team members
   const fetchTeamMembers = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .order("name");
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .order("name");
 
-    if (!error && data) {
-      setTeamMembers(
-        data.map((u: { id: string; email: string; name: string; role: string }) => ({
-          id: u.id,
-          email: u.email,
-          name: u.name,
-          role: (u.role || "member") as "admin" | "member",
-        }))
-      );
+      if (!error && data && isMounted.current) {
+        setTeamMembers(
+          data.map((u: { id: string; email: string; name: string; role: string }) => ({
+            id: u.id,
+            email: u.email,
+            name: u.name,
+            role: (u.role || "member") as "admin" | "member",
+          }))
+        );
+      }
+    } catch (e) {
+      console.error("fetchTeamMembers error:", e);
     }
   }, []);
 
-  // Check existing session on mount
+  // Check existing session on mount with timeout + corruption protection
   useEffect(() => {
+    isMounted.current = true;
+    let subscription: { unsubscribe: () => void } | null = null;
+
     const init = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
+        // Use a timeout to prevent getSession() from hanging on corrupt tokens
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("getSession timed out")), 8000)
+        );
+
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
+
+        if (session?.user && isMounted.current) {
           const profile = await fetchUserProfile(session.user.id);
-          if (profile) {
+          if (profile && isMounted.current) {
             setUser(profile);
             await fetchTeamMembers();
-          } else {
+          } else if (isMounted.current) {
             // Auth user exists but no profile row — sign them out
             await supabase.auth.signOut();
             setUser(null);
@@ -76,28 +96,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (e) {
         console.error("Auth init error:", e);
-      }
-      setIsLoading(false);
-    };
-    init();
-
-    // Listen to auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === "SIGNED_IN" && session?.user) {
-          const profile = await fetchUserProfile(session.user.id);
-          if (profile) {
-            setUser(profile);
-            await fetchTeamMembers();
-          }
-        } else if (event === "SIGNED_OUT") {
+        // If session retrieval fails (corrupt token, timeout, etc.), clear storage and recover
+        clearSupabaseAuth();
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // signOut may also fail if token is corrupt, that's okay
+        }
+        if (isMounted.current) {
           setUser(null);
-          setTeamMembers([]);
         }
       }
-    );
 
-    return () => subscription.unsubscribe();
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
+    };
+
+    init();
+
+    // Listen to auth state changes with error protection
+    try {
+      const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          if (!isMounted.current) return;
+
+          if (event === "TOKEN_REFRESHED" && !session) {
+            // Token refresh failed — corrupted session, clear and sign out
+            console.warn("Token refresh failed, clearing auth state");
+            clearSupabaseAuth();
+            setUser(null);
+            setIsLoading(false);
+            return;
+          }
+
+          if (event === "SIGNED_IN" && session?.user) {
+            const profile = await fetchUserProfile(session.user.id);
+            if (profile && isMounted.current) {
+              setUser(profile);
+              await fetchTeamMembers();
+            }
+          } else if (event === "SIGNED_OUT") {
+            if (isMounted.current) {
+              setUser(null);
+              setTeamMembers([]);
+            }
+          }
+        }
+      );
+      subscription = sub;
+    } catch (e) {
+      console.error("Failed to set up auth listener:", e);
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
+    }
+
+    return () => {
+      isMounted.current = false;
+      subscription?.unsubscribe();
+    };
   }, [fetchUserProfile, fetchTeamMembers]);
 
   const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
@@ -115,14 +173,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: "Login failed. Please try again." };
       }
 
-      const profile = await fetchUserProfile(data.user.id);
+      let profile = await fetchUserProfile(data.user.id);
+      
+      // Auto-heal missing or disconnected profiles
+      if (!profile) {
+        const { data: profileByEmail } = await supabase
+          .from("users")
+          .select("*")
+          .eq("email", email)
+          .single();
+
+        if (profileByEmail) {
+          // Profile exists with different ID — migrate it
+          const oldId = profileByEmail.id;
+          const newId = data.user.id;
+
+          await Promise.all([
+            supabase.from("leads").update({ assigned_to: newId }).eq("assigned_to", oldId),
+            supabase.from("leads").update({ uploaded_by: newId }).eq("uploaded_by", oldId),
+            supabase.from("activities").update({ user_id: newId }).eq("user_id", oldId),
+            supabase.from("activity_logs").update({ user_id: newId }).eq("user_id", oldId),
+            supabase.from("upload_batches").update({ uploaded_by: newId }).eq("uploaded_by", oldId),
+          ]);
+
+          await supabase.from("users").delete().eq("id", oldId);
+          await supabase.from("users").insert([{
+            id: newId,
+            email: profileByEmail.email,
+            name: profileByEmail.name || email.split("@")[0],
+            role: profileByEmail.role || "admin", // Fallback to admin if it's the first time linking
+          }]);
+        } else {
+          // No profile at all, create a brand new one
+          await supabase.from("users").insert([{
+            id: data.user.id,
+            email: email,
+            name: email.split("@")[0],
+            role: "admin", // Make them admin since they had valid auth credentials
+          }]);
+        }
+        
+        // Fetch again after self-healing
+        profile = await fetchUserProfile(data.user.id);
+      }
+
       if (profile) {
         setUser(profile);
         await fetchTeamMembers();
         return { success: true };
       }
       
-      return { success: false, error: "No user profile found. Contact your admin." };
+      return { success: false, error: "Failed to sync user profile. Please contact support." };
     } catch (e: any) {
       console.error("Login error:", e);
       return { success: false, error: e.message || "An unexpected error occurred." };
@@ -211,7 +312,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchUserProfile, fetchTeamMembers]);
 
   const logout = useCallback(async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
+    // Always clear storage to prevent stale token issues
+    clearSupabaseAuth();
     setUser(null);
     setTeamMembers([]);
   }, []);
