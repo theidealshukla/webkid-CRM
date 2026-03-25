@@ -26,14 +26,18 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // Show loading spinner while checking auth
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-        <div className="flex flex-col items-center gap-4 animate-fade-in">
-          <div className="h-14 w-14 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-xl border border-white/10">
-            <span className="text-white font-bold text-xl">W</span>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-5 animate-fade-in p-8 text-center max-w-sm">
+          <div className="h-16 w-16 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-200">
+            <span className="text-white font-bold text-2xl tracking-tighter">W</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="h-5 w-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-            <span className="text-white/70 text-sm font-medium">Loading...</span>
+          <div className="space-y-2">
+            <h2 className="text-lg font-bold text-gray-900 tracking-tight">Starting your dashboard</h2>
+            <p className="text-sm font-medium text-gray-500">Loading Webkid CRM... please wait a few seconds.</p>
+          </div>
+          <div className="mt-4 flex items-center gap-3 bg-white px-4 py-2 rounded-full border border-gray-100 shadow-sm">
+            <div className="h-4 w-4 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+            <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Authenticating</span>
           </div>
         </div>
       </div>
