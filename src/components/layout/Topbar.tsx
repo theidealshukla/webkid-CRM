@@ -1,0 +1,91 @@
+"use client";
+
+import React, { useState } from "react";
+import { Search, Plus, Upload, LogOut, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/context/AuthContext";
+
+interface TopbarProps {
+  onAddLead: () => void;
+  onUploadExcel: () => void;
+  searchTerm: string;
+  onSearchChange: (value: string) => void;
+}
+
+export function Topbar({ onAddLead, onUploadExcel, searchTerm, onSearchChange }: TopbarProps) {
+  const { user, logout } = useAuth();
+
+  const initials = user?.name
+    ?.split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase() || "U";
+
+  return (
+    <header className="sticky top-0 z-30 h-16 bg-white/80 backdrop-blur-sm border-b border-gray-200 flex items-center justify-between px-4 md:px-6">
+      {/* Search */}
+      <div className="relative w-full max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input
+          placeholder="Search leads..."
+          value={searchTerm}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="pl-9 bg-gray-50 border-gray-200"
+        />
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-3">
+        <Button size="sm" variant="outline" onClick={onUploadExcel} className="hidden sm:flex gap-2">
+          <Upload className="h-4 w-4" />
+          Upload Excel
+        </Button>
+        <Button size="sm" onClick={onAddLead} className="gap-2">
+          <Plus className="h-4 w-4" />
+          <span className="hidden sm:inline">Add Lead</span>
+        </Button>
+
+        {/* Avatar Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-indigo-100 text-indigo-700 text-xs font-semibold">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">{user?.name}</span>
+                <span className="text-xs text-muted-foreground">{user?.email}</span>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => window.location.href = "/crm/settings"}>
+              <User className="mr-2 h-4 w-4" />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={logout} className="text-red-600">
+              <LogOut className="mr-2 h-4 w-4" />
+              Log Out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </header>
+  );
+}
