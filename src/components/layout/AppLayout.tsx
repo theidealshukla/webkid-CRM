@@ -14,28 +14,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [showAddLead, setShowAddLead] = useState(false);
   const [showUploadExcel, setShowUploadExcel] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const { isAuthenticated, isLoading } = useAuth();
-  const router = useRouter();
-  const pathname = usePathname();
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated && pathname !== "/crm/login") {
-      router.push("/crm/login");
-    }
-  }, [isLoading, isAuthenticated, pathname, router]);
-
-  if (isLoading) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-white">
-        <div className="h-8 w-8 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
   return (
     <div className="min-h-screen bg-gray-50/30">
       <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
