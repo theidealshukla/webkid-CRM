@@ -42,6 +42,60 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
     router.replace("/crm/login");
   };
 
+  const [localAvatar, setLocalAvatar] = React.useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (user?.id) {
+      const saved = localStorage.getItem(`avatar_${user.id}`);
+      if (saved) setLocalAvatar(saved);
+    }
+  }, [user?.id]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 120; // Maintain tiny file size for localStorage
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        setLocalAvatar(dataUrl);
+        if (user?.id) {
+          localStorage.setItem(`avatar_${user.id}`, dataUrl);
+          window.dispatchEvent(new Event("avatarUpdated"));
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+    // Reset input so the same file could be selected again if needed
+    e.target.value = "";
+  };
+
   const initials = user?.name
     ?.split(" ")
     .map((n) => n[0])
@@ -52,10 +106,8 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
     <aside
       className={cn(
         "fixed left-0 top-0 z-40 h-screen bg-white border-r border-gray-200 transition-all duration-300 flex flex-col",
-        // Desktop: always visible, width based on collapsed
         "hidden md:flex",
         collapsed ? "w-[68px]" : "w-64",
-        // Mobile: slide-in overlay when open
         mobileOpen && "!flex w-64"
       )}
     >
@@ -133,9 +185,28 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
       {/* User Profile & Logout */}
       <div className="border-t border-gray-100 p-3 bg-gray-50/50">
         {(!collapsed || mobileOpen) && user && (
-          <div className="flex items-center gap-3 px-2 py-2 mb-2">
-            <div className="h-9 w-9 rounded-full bg-white shadow-sm border border-gray-200 flex items-center justify-center flex-shrink-0">
-              <span className="text-gray-700 text-xs font-bold">{initials}</span>
+          <div className="flex items-center gap-3 px-2 py-2 mb-2 group relative">
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="h-10 w-10 rounded-full bg-white shadow-sm border border-gray-200 flex items-center justify-center flex-shrink-0 cursor-pointer overflow-hidden relative transition-colors hover:border-indigo-400 group/avatar"
+              title="Click to upload avatar"
+            >
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleFileChange} 
+              />
+              {localAvatar ? (
+                <img src={localAvatar} alt={user.name} className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-gray-700 text-xs font-bold">{initials}</span>
+              )}
+              {/* Hover overlay */}
+              <div className="absolute inset-0 bg-black/50 hidden group-hover/avatar:flex items-center justify-center transition-all">
+                <span className="text-[9px] text-white font-bold uppercase tracking-widest">Edit</span>
+              </div>
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-sm font-semibold text-gray-900 truncate">{user.name}</span>

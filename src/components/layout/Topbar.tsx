@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/AuthContext";
 import { useCRM } from "@/context/CRMContext";
+import { NotificationBell } from "./NotificationBell";
 
 interface TopbarProps {
   onAddLead: () => void;
@@ -26,6 +27,20 @@ export function Topbar({ onAddLead, onUploadExcel, onMenuToggle }: TopbarProps) 
   const { user, logout } = useAuth();
   const { refreshData, isLoadingData } = useCRM();
   const router = useRouter();
+  const [localAvatar, setLocalAvatar] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (user?.id) {
+      const loadAvatar = () => {
+        const saved = localStorage.getItem(`avatar_${user.id}`);
+        if (saved) setLocalAvatar(saved);
+      };
+      loadAvatar();
+      
+      window.addEventListener("avatarUpdated", loadAvatar);
+      return () => window.removeEventListener("avatarUpdated", loadAvatar);
+    }
+  }, [user?.id]);
 
   const initials = user?.name
     ?.split(" ")
@@ -74,11 +89,18 @@ export function Topbar({ onAddLead, onUploadExcel, onMenuToggle }: TopbarProps) 
           <span className="hidden sm:inline">Add Lead</span>
         </Button>
 
+        {/* Notification Bell */}
+        <NotificationBell />
+
         {/* Avatar Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center justify-center h-9 w-9 rounded-full bg-white shadow-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-shadow hover:shadow-md ml-1">
-              <span className="text-gray-700 text-xs font-bold">{initials}</span>
+            <button className="flex items-center justify-center h-9 w-9 rounded-full bg-white shadow-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-shadow hover:shadow-md ml-1 overflow-hidden relative">
+              {localAvatar ? (
+                <img src={localAvatar} alt={user?.name} className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-gray-700 text-xs font-bold">{initials}</span>
+              )}
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-lg border-gray-100">

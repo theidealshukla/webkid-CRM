@@ -9,6 +9,19 @@ import { Shield } from "lucide-react";
 
 export default function SettingsPage() {
   const { user, teamMembers } = useAuth();
+  const [localAvatar, setLocalAvatar] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (user?.id) {
+      const loadAvatar = () => {
+        const saved = localStorage.getItem(`avatar_${user.id}`);
+        if (saved) setLocalAvatar(saved);
+      };
+      loadAvatar();
+      window.addEventListener("avatarUpdated", loadAvatar);
+      return () => window.removeEventListener("avatarUpdated", loadAvatar);
+    }
+  }, [user?.id]);
 
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl">
@@ -24,11 +37,15 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="pt-6">
           <div className="flex items-center gap-5">
-            <Avatar className="h-16 w-16 shadow-sm border border-indigo-100">
-              <AvatarFallback className="bg-indigo-50 text-indigo-700 text-xl font-bold">
-                {user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase() || "U"}
-              </AvatarFallback>
-            </Avatar>
+            <div className="h-16 w-16 rounded-full shadow-sm border border-indigo-100 flex items-center justify-center overflow-hidden bg-indigo-50 shrink-0 relative">
+              {localAvatar ? (
+                <img src={localAvatar} alt={user?.name} className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-indigo-700 text-xl font-bold">
+                  {user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase() || "U"}
+                </span>
+              )}
+            </div>
             <div>
               <p className="text-lg font-bold text-gray-900">{user?.name}</p>
               <p className="text-sm font-medium text-gray-500">{user?.email}</p>
