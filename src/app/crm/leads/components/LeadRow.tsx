@@ -20,6 +20,7 @@ import {
   Archive,
   Globe,
   MessageCircle,
+  Trash2,
 } from "lucide-react";
 import { TableRow, TableCell } from "@/components/ui/table";
 import type { Lead, LeadStatus } from "@/types";
@@ -32,6 +33,7 @@ interface LeadRowProps {
   onStatusChange: (leadId: string, status: LeadStatus) => void;
   onAssign: (leadId: string, assignee: string) => void;
   onArchive: (leadId: string) => void;
+  onDelete: (leadId: string) => void;
   teamMembers: string[];
 }
 
@@ -41,6 +43,7 @@ const LeadRow = React.memo(function LeadRow({
   onStatusChange,
   onAssign,
   onArchive,
+  onDelete,
   teamMembers,
 }: LeadRowProps) {
   const [actionDialog, setActionDialog] = useState<{
@@ -58,10 +61,10 @@ const LeadRow = React.memo(function LeadRow({
         <TableCell className="w-[4%] text-xs text-gray-400 font-mono">{index}</TableCell>
 
         {/* Business Name */}
-        <TableCell className="w-[23%]">
+        <TableCell className="w-[23%] py-3">
           <Link
             href={`/crm/leads/${lead.id}`}
-            className="text-sm font-medium text-gray-900 hover:text-blue-600 hover:underline transition-colors"
+            className="text-sm font-semibold text-gray-900 hover:text-indigo-600 transition-colors"
           >
             {lead.businessName}
           </Link>
@@ -99,9 +102,10 @@ const LeadRow = React.memo(function LeadRow({
         </TableCell>
 
         {/* Source */}
-        <TableCell className="w-[9%]">
+        <TableCell className="w-[9%] py-3">
           <Badge
-            className={`${srcStyle.bg} ${srcStyle.text} ${srcStyle.border} border uppercase text-[10px] tracking-wider font-semibold`}
+            variant="outline"
+            className={`${srcStyle.bg} ${srcStyle.text} border-transparent uppercase text-[10px] tracking-wider font-bold`}
           >
             {lead.source}
           </Badge>
@@ -113,28 +117,28 @@ const LeadRow = React.memo(function LeadRow({
         </TableCell>
 
         {/* Status - clickable dropdown */}
-        <TableCell className="w-[10%]">
+        <TableCell className="w-[10%] py-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="focus:outline-none">
-                <Badge
-                  className={`${statusStyle.bg} ${statusStyle.text} uppercase text-[10px] tracking-wider font-semibold border-0 cursor-pointer hover:opacity-80 transition-opacity`}
+                <div
+                  className={`inline-flex items-center px-2 py-1 rounded-md ${statusStyle.bg} ${statusStyle.text} uppercase text-[10px] tracking-wider font-bold cursor-pointer hover:opacity-80 transition-opacity`}
                 >
                   {statusStyle.label}
-                </Badge>
+                </div>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-44">
+            <DropdownMenuContent align="start" className="w-44 rounded-xl shadow-lg border-gray-100">
               {ALL_STATUSES.map((s) => {
                 const cfg = statusConfig[s];
                 return (
                   <DropdownMenuItem
                     key={s}
                     onClick={() => onStatusChange(lead.id, s)}
-                    className="gap-2"
+                    className="gap-2 rounded-lg m-1 cursor-pointer"
                   >
                     <span className={`h-2 w-2 rounded-full ${cfg.dot}`} />
-                    {cfg.label}
+                    <span className="font-medium text-gray-700">{cfg.label}</span>
                   </DropdownMenuItem>
                 );
               })}
@@ -143,25 +147,25 @@ const LeadRow = React.memo(function LeadRow({
         </TableCell>
 
         {/* Assignee - clickable dropdown */}
-        <TableCell className="w-[11%]">
+        <TableCell className="w-[11%] py-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 focus:outline-none group/assign">
-                <div className="h-6 w-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-semibold">
+              <button className="flex items-center gap-2.5 focus:outline-none group/assign hover:bg-gray-50 p-1.5 -ml-1.5 rounded-lg transition-colors">
+                <div className="h-6 w-6 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold">
                   {(lead.assignedToName || lead.assignedTo)?.[0]?.toUpperCase() || "?"}
                 </div>
-                <span className="text-sm text-gray-700 group-hover/assign:text-blue-600 transition-colors">
+                <span className="text-sm font-medium text-gray-700 group-hover/assign:text-indigo-600 transition-colors">
                   {lead.assignedToName || lead.assignedTo || "Unassigned"}
                 </span>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-44">
+            <DropdownMenuContent align="start" className="w-44 rounded-xl shadow-lg border-gray-100">
               {teamMembers.map((name) => (
-                <DropdownMenuItem key={name} onClick={() => onAssign(lead.id, name)}>
-                  <div className="h-5 w-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-semibold mr-2">
+                <DropdownMenuItem key={name} onClick={() => onAssign(lead.id, name)} className="rounded-lg m-1 cursor-pointer">
+                  <div className="h-5 w-5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold mr-2">
                     {name[0]?.toUpperCase()}
                   </div>
-                  {name}
+                  <span className="font-medium text-gray-700">{name}</span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -174,38 +178,41 @@ const LeadRow = React.memo(function LeadRow({
         </TableCell>
 
         {/* Actions */}
-        <TableCell className="w-[5%]">
+        <TableCell className="w-[5%] py-3 text-right pr-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100">
-                <MoreHorizontal className="h-4 w-4 text-gray-500" />
+              <button className="h-8 w-8 inline-flex items-center justify-center rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors text-gray-400">
+                <MoreHorizontal className="h-5 w-5" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem asChild>
-                <Link href={`/crm/leads/${lead.id}`} className="gap-2">
-                  <Eye className="h-4 w-4" /> View Details
+            <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-gray-100">
+              <DropdownMenuItem asChild className="rounded-lg m-1 cursor-pointer">
+                <Link href={`/crm/leads/${lead.id}`} className="gap-2.5 font-medium text-gray-700">
+                  <Eye className="h-4 w-4 text-gray-400" /> View Details
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setActionDialog({ open: true, tab: "note" })} className="gap-2">
-                <FileText className="h-4 w-4" /> Add Note
+              <DropdownMenuItem onClick={() => setActionDialog({ open: true, tab: "note" })} className="gap-2.5 rounded-lg m-1 cursor-pointer font-medium text-gray-700">
+                <FileText className="h-4 w-4 text-gray-400" /> Add Note
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setActionDialog({ open: true, tab: "call" })} className="gap-2">
-                <PhoneCall className="h-4 w-4" /> Log Call
+              <DropdownMenuItem onClick={() => setActionDialog({ open: true, tab: "call" })} className="gap-2.5 rounded-lg m-1 cursor-pointer font-medium text-gray-700">
+                <PhoneCall className="h-4 w-4 text-gray-400" /> Log Call
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setActionDialog({ open: true, tab: "follow-up" })} className="gap-2">
-                <CalendarPlus className="h-4 w-4" /> Set Follow-up
+              <DropdownMenuItem onClick={() => setActionDialog({ open: true, tab: "follow-up" })} className="gap-2.5 rounded-lg m-1 cursor-pointer font-medium text-gray-700">
+                <CalendarPlus className="h-4 w-4 text-gray-400" /> Set Follow-up
               </DropdownMenuItem>
               {lead.mapsLink && (
-                <DropdownMenuItem asChild className="gap-2">
+                <DropdownMenuItem asChild className="gap-2.5 rounded-lg m-1 cursor-pointer font-medium text-gray-700">
                   <a href={lead.mapsLink} target="_blank" rel="noopener noreferrer">
-                    <MapPin className="h-4 w-4" /> View on Maps
+                    <MapPin className="h-4 w-4 text-gray-400" /> View on Maps
                   </a>
                 </DropdownMenuItem>
               )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onArchive(lead.id)} className="gap-2 text-red-600">
-                <Archive className="h-4 w-4" /> Archive Lead
+              <DropdownMenuSeparator className="bg-gray-100" />
+              <DropdownMenuItem onClick={() => onArchive(lead.id)} className="gap-2.5 rounded-lg m-1 cursor-pointer font-semibold text-amber-600 hover:bg-amber-50 focus:bg-amber-50 group">
+                <Archive className="h-4 w-4 text-amber-500 group-hover:text-amber-600 transition-colors" /> Archive Lead
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { if (confirm("Are you sure you want to delete this lead?")) onDelete(lead.id); }} className="gap-2.5 rounded-lg m-1 cursor-pointer font-semibold text-red-600 hover:bg-red-50 focus:bg-red-50 group">
+                <Trash2 className="h-4 w-4 text-red-500 group-hover:text-red-600 transition-colors" /> Delete Lead
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -238,6 +245,7 @@ const MobileLeadCard = React.memo(function MobileLeadCard({
   onStatusChange,
   onAssign,
   onArchive,
+  onDelete,
   teamMembers,
 }: Omit<LeadRowProps, "index">) {
   const [actionDialog, setActionDialog] = useState<{
@@ -323,8 +331,11 @@ const MobileLeadCard = React.memo(function MobileLeadCard({
                 <CalendarPlus className="h-4 w-4" /> Set Follow-up
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onArchive(lead.id)} className="gap-2 text-red-600">
+              <DropdownMenuItem onClick={() => onArchive(lead.id)} className="gap-2 text-amber-600">
                 <Archive className="h-4 w-4" /> Archive Lead
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { if (confirm("Are you sure you want to delete this lead?")) onDelete(lead.id); }} className="gap-2 text-red-600">
+                <Trash2 className="h-4 w-4" /> Delete Lead
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

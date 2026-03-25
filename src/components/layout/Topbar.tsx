@@ -39,16 +39,16 @@ export function Topbar({ onAddLead, onUploadExcel, onMenuToggle }: TopbarProps) 
   };
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-white/80 backdrop-blur-sm border-b border-gray-200 flex items-center justify-between px-4 md:px-6">
+    <header className="sticky top-0 z-30 h-16 bg-white/70 backdrop-blur-xl border-b border-gray-100 flex items-center justify-between px-4 md:px-6">
       {/* Mobile menu button + Title */}
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuToggle}
-          className="md:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+          className="md:hidden p-2 rounded-xl text-gray-500 hover:bg-gray-50 transition-colors"
         >
           <Menu className="h-5 w-5" />
         </button>
-        <h2 className="text-sm font-semibold text-gray-700 md:hidden">Webkid CRM</h2>
+        <h2 className="text-sm font-semibold text-gray-700 md:hidden" style={{ fontFamily: "'Clash Display', sans-serif" }}>Webkid CRM</h2>
       </div>
 
       {/* Spacer for desktop */}
@@ -61,15 +61,15 @@ export function Topbar({ onAddLead, onUploadExcel, onMenuToggle }: TopbarProps) 
           variant="outline"
           onClick={refreshData}
           disabled={isLoadingData}
-          className="hidden sm:flex"
+          className="hidden sm:flex rounded-xl shadow-sm hover:bg-gray-50 border-gray-200"
         >
-          <RefreshCcw className={`h-4 w-4 ${isLoadingData ? "animate-spin" : ""}`} />
+          <RefreshCcw className={`h-4 w-4 text-gray-500 ${isLoadingData ? "animate-spin" : ""}`} />
         </Button>
-        <Button size="sm" variant="outline" onClick={onUploadExcel} className="hidden sm:flex gap-2">
-          <Upload className="h-4 w-4" />
+        <Button size="sm" variant="outline" onClick={onUploadExcel} className="hidden sm:flex gap-2 rounded-xl shadow-sm hover:bg-gray-50 border-gray-200 text-gray-700">
+          <Upload className="h-4 w-4 text-gray-500" />
           Upload Excel
         </Button>
-        <Button size="sm" onClick={onAddLead} className="gap-2">
+        <Button size="sm" onClick={onAddLead} className="gap-2 rounded-xl shadow-sm bg-indigo-600 hover:bg-indigo-700 text-white border-0 transition-colors">
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Add Lead</span>
         </Button>
@@ -77,30 +77,26 @@ export function Topbar({ onAddLead, onUploadExcel, onMenuToggle }: TopbarProps) 
         {/* Avatar Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-indigo-100 text-indigo-700 text-xs font-semibold">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
+            <button className="flex items-center justify-center h-9 w-9 rounded-full bg-white shadow-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-shadow hover:shadow-md ml-1">
+              <span className="text-gray-700 text-xs font-bold">{initials}</span>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">{user?.name}</span>
-                <span className="text-xs text-muted-foreground">{user?.email}</span>
+          <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-lg border-gray-100">
+            <DropdownMenuLabel className="font-normal p-3">
+              <div className="flex flex-col space-y-1">
+                <span className="text-sm font-semibold text-gray-900 leading-none">{user?.name}</span>
+                <span className="text-xs text-gray-400 leading-none mt-1">{user?.email}</span>
               </div>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push("/crm/settings")}>
-              <User className="mr-2 h-4 w-4" />
-              Settings
+            <DropdownMenuSeparator className="bg-gray-100" />
+            <DropdownMenuItem onClick={() => router.push("/crm/settings")} className="rounded-lg m-1 cursor-pointer hover:bg-gray-50 focus:bg-gray-50">
+              <User className="mr-2 h-4 w-4 text-gray-400" />
+              <span className="text-sm font-medium text-gray-700">Settings</span>
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="text-red-600">
-              <LogOut className="mr-2 h-4 w-4" />
-              Log Out
+            <DropdownMenuSeparator className="bg-gray-100" />
+            <DropdownMenuItem onClick={handleLogout} className="rounded-lg m-1 cursor-pointer hover:bg-red-50 focus:bg-red-50 group">
+              <LogOut className="mr-2 h-4 w-4 text-gray-400 group-hover:text-red-500 transition-colors" />
+              <span className="text-sm font-medium text-red-600">Log Out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

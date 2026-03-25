@@ -23,6 +23,7 @@ interface CRMContextType {
   addActivity: (activity: Omit<Activity, "id">) => void;
   uploadExcelLeads: (leads: Omit<Lead, "id" | "createdAt" | "lastActivity">[], batch: Omit<UploadBatch, "id">) => void;
   archiveBatch: (batchId: string) => void;
+  deleteBatch: (batchId: string) => void;
   refreshData: () => Promise<void>;
 }
 
@@ -434,6 +435,33 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loadData, addLog]);
 
+  const deleteBatch = useCallback(async (batchId: string) => {
+    try {
+      // Optimistic locally
+      setBatches(prev => prev.filter(b => b.id !== batchId));
+      setLeads(prev => prev.filter(l => l.batchId !== batchId));
+      
+      // Delete activities of these leads first to avoid FK constraint issues
+      const matchingLeads = leads.filter(l => l.batchId === batchId);
+      if (matchingLeads.length > 0) {
+        const leadIds = matchingLeads.map(l => l.id);
+        await supabase.from("activities").delete().in("lead_id", leadIds);
+      }
+
+      // Supabase cascade should handle if setup, but manual ensures
+      await supabase.from("leads").delete().eq("batch_id", batchId);
+      const { error } = await supabase.from("upload_batches").delete().eq("id", batchId);
+      
+      if (error) throw error;
+      addLog("Deleted Batch", "batch", batchId);
+      toast.success("Batch and its associated leads deleted");
+    } catch (e: any) {
+      console.error("Delete batch error:", e);
+      toast.error("Failed to delete batch");
+      loadData();
+    }
+  }, [leads, loadData, addLog]);
+
   return (
     <CRMContext.Provider
       value={{
@@ -452,6 +480,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         addActivity,
         uploadExcelLeads,
         archiveBatch,
+        deleteBatch,
         refreshData: loadData,
       }}
     >

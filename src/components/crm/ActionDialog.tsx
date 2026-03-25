@@ -80,7 +80,8 @@ export function ActionDialog({ open, onClose, leadId, leadName, defaultTab = "no
       leadId,
       type: "follow-up",
       user: user?.name || "Unknown",
-      date: new Date(`${followUpDate}T${followUpTime || "09:00"}`).toISOString(),
+      date: new Date().toISOString(),
+      reminderDate: new Date(`${followUpDate}T${followUpTime || "09:00"}`).toISOString(),
       content: followUpNotes || "Follow-up scheduled",
     });
     toast.success("Follow-up created");
@@ -105,29 +106,30 @@ export function ActionDialog({ open, onClose, leadId, leadName, defaultTab = "no
             <TabsTrigger value="follow-up" className="flex-1">Follow Up</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="note" className="space-y-3 mt-4">
-            <div className="space-y-1.5">
-              <Label>Note</Label>
+          <TabsContent value="note" className="space-y-4 mt-6">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Note</Label>
               <Textarea
                 value={noteContent}
                 onChange={(e) => setNoteContent(e.target.value)}
                 placeholder="Write a note..."
                 rows={4}
+                className="rounded-xl bg-gray-50/50 resize-none"
               />
             </div>
-            <Button onClick={handleAddNote} className="w-full" disabled={!noteContent.trim()}>
+            <Button onClick={handleAddNote} className="w-full rounded-xl shadow-sm h-11 font-bold" disabled={!noteContent.trim()}>
               Add Note
             </Button>
           </TabsContent>
 
-          <TabsContent value="call" className="space-y-3 mt-4">
-            <div className="space-y-1.5">
-              <Label>Outcome</Label>
+          <TabsContent value="call" className="space-y-4 mt-6">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Outcome</Label>
               <Select value={callOutcome} onValueChange={setCallOutcome}>
-                <SelectTrigger>
+                <SelectTrigger className="rounded-xl bg-gray-50/50">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl shadow-lg border-gray-100">
                   <SelectItem value="interested">Interested</SelectItem>
                   <SelectItem value="not_interested">Not Interested</SelectItem>
                   <SelectItem value="no_answer">No Answer</SelectItem>
@@ -136,49 +138,53 @@ export function ActionDialog({ open, onClose, leadId, leadName, defaultTab = "no
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>Notes</Label>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Notes</Label>
               <Textarea
                 value={callNotes}
                 onChange={(e) => setCallNotes(e.target.value)}
                 placeholder="Call notes..."
                 rows={3}
+                className="rounded-xl bg-gray-50/50 resize-none"
               />
             </div>
-            <Button onClick={handleLogCall} className="w-full">
+            <Button onClick={handleLogCall} className="w-full rounded-xl shadow-sm h-11 font-bold">
               Save Call Log
             </Button>
           </TabsContent>
 
-          <TabsContent value="follow-up" className="space-y-3 mt-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Date</Label>
+          <TabsContent value="follow-up" className="space-y-4 mt-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Date</Label>
                 <Input
                   type="date"
                   value={followUpDate}
                   onChange={(e) => setFollowUpDate(e.target.value)}
+                  className="rounded-xl bg-gray-50/50"
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label>Time</Label>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Time</Label>
                 <Input
                   type="time"
                   value={followUpTime}
                   onChange={(e) => setFollowUpTime(e.target.value)}
+                  className="rounded-xl bg-gray-50/50"
                 />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Notes</Label>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Notes</Label>
               <Textarea
                 value={followUpNotes}
                 onChange={(e) => setFollowUpNotes(e.target.value)}
                 placeholder="Follow-up details..."
                 rows={3}
+                className="rounded-xl bg-gray-50/50 resize-none"
               />
             </div>
-            <Button onClick={handleFollowUp} className="w-full">
+            <Button onClick={handleFollowUp} className="w-full rounded-xl shadow-sm h-11 font-bold">
               Create Reminder
             </Button>
           </TabsContent>

@@ -160,7 +160,8 @@ export default function LeadDetailPage() {
       leadId,
       type: "follow-up",
       user: user?.name || "Unknown",
-      date: new Date(`${followUpDate}T${followUpTime || "09:00"}`).toISOString(),
+      date: new Date().toISOString(),
+      reminderDate: new Date(`${followUpDate}T${followUpTime || "09:00"}`).toISOString(),
       content: followUpNotes || "Follow-up scheduled",
     });
     setFollowUpDate("");
@@ -184,16 +185,16 @@ export default function LeadDetailPage() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button>
-                <Badge className={`${statusStyle.bg} ${statusStyle.text} uppercase text-[10px] tracking-wider font-semibold border-0 cursor-pointer hover:opacity-80`}>
+                <div className={`inline-flex items-center px-3 py-1.5 rounded-lg ${statusStyle.bg} ${statusStyle.text} uppercase text-[10px] tracking-wider font-bold cursor-pointer hover:opacity-80 transition-opacity shadow-sm`}>
                   {statusStyle.label}
-                </Badge>
+                </div>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
+            <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-gray-100">
               {ALL_STATUSES.map((s) => (
-                <DropdownMenuItem key={s} onClick={() => updateLeadStatus(leadId, s)}>
-                  <span className={`h-2 w-2 rounded-full ${statusConfig[s].dot} mr-2`} />
-                  {statusConfig[s].label}
+                <DropdownMenuItem key={s} onClick={() => updateLeadStatus(leadId, s)} className="rounded-lg m-1 cursor-pointer">
+                  <span className={`h-2.5 w-2.5 rounded-full ${statusConfig[s].dot} mr-3`} />
+                  <span className="font-medium text-gray-700">{statusConfig[s].label}</span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -201,12 +202,12 @@ export default function LeadDetailPage() {
         </div>
         <div>
           {isEditing ? (
-            <Button onClick={handleSaveEdit} className="gap-2">
-              <Save className="h-4 w-4" /> Save
+            <Button onClick={handleSaveEdit} className="gap-2 rounded-xl shadow-sm">
+              <Save className="h-4 w-4" /> Save Changes
             </Button>
           ) : (
-            <Button variant="outline" onClick={() => setIsEditing(true)} className="gap-2">
-              <Edit className="h-4 w-4" /> Edit
+            <Button variant="outline" onClick={() => setIsEditing(true)} className="gap-2 rounded-xl text-gray-700 hover:text-gray-900 shadow-sm bg-white">
+              <Edit className="h-4 w-4" /> Edit Details
             </Button>
           )}
         </div>
@@ -215,67 +216,67 @@ export default function LeadDetailPage() {
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column */}
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* Contact Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Contact Info</CardTitle>
+          <Card className="border-0 shadow-sm rounded-2xl bg-white overflow-hidden">
+            <CardHeader className="bg-gray-50/50 border-b border-gray-100 pb-4">
+              <CardTitle className="text-xs font-bold text-gray-500 uppercase tracking-wider">Contact Info</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center">
-                  <Phone className="h-4 w-4 text-gray-500" />
+            <CardContent className="space-y-5 pt-6">
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100 shadow-sm flex-shrink-0">
+                  <Phone className="h-4 w-4 text-indigo-500" />
                 </div>
                 {isEditing ? (
-                  <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} placeholder="Phone" />
+                  <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} placeholder="Phone" className="rounded-xl flex-1 bg-gray-50" />
                 ) : (
-                  <span className="text-sm text-gray-700">{lead.phone || "—"}</span>
+                  <span className="text-sm font-medium text-gray-900">{lead.phone || "—"}</span>
                 )}
               </div>
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center">
-                  <Mail className="h-4 w-4 text-gray-500" />
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100 shadow-sm flex-shrink-0">
+                  <Mail className="h-4 w-4 text-emerald-500" />
                 </div>
                 {isEditing ? (
-                  <Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} placeholder="Email" />
+                  <Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} placeholder="Email" className="rounded-xl flex-1 bg-gray-50" />
                 ) : (
-                  <span className="text-sm text-gray-700">{lead.email || "—"}</span>
+                  <span className="text-sm font-medium text-gray-900">{lead.email || "—"}</span>
                 )}
               </div>
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center">
-                  <Globe className="h-4 w-4 text-gray-500" />
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100 shadow-sm flex-shrink-0">
+                  <Globe className="h-4 w-4 text-blue-500" />
                 </div>
                 {isEditing ? (
-                  <Input value={editForm.website} onChange={(e) => setEditForm({ ...editForm, website: e.target.value })} placeholder="Website" />
+                  <Input value={editForm.website} onChange={(e) => setEditForm({ ...editForm, website: e.target.value })} placeholder="Website" className="rounded-xl flex-1 bg-gray-50" />
                 ) : (
-                  <span className="text-sm text-gray-700">{lead.website ? <a href={lead.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{lead.website}</a> : "—"}</span>
+                  <span className="text-sm font-medium text-gray-900">{lead.website ? <a href={lead.website} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700 hover:underline transition-colors">{lead.website}</a> : "—"}</span>
                 )}
               </div>
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center">
-                  <MapPin className="h-4 w-4 text-gray-500" />
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100 shadow-sm flex-shrink-0">
+                  <MapPin className="h-4 w-4 text-amber-500" />
                 </div>
                 {isEditing ? (
-                  <Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} placeholder="Address" />
+                  <Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} placeholder="Address" className="rounded-xl flex-1 bg-gray-50" />
                 ) : (
-                  <span className="text-sm text-gray-700">{lead.address || "—"}</span>
+                  <span className="text-sm font-medium text-gray-900">{lead.address || "—"}</span>
                 )}
               </div>
 
               {/* Quick Actions */}
-              <div className="flex gap-2 pt-2 border-t">
+              <div className="flex gap-3 pt-4 border-t border-gray-100">
                 {lead.website && (
-                  <Button variant="outline" size="sm" asChild className="flex-1 gap-1">
+                  <Button variant="outline" size="sm" asChild className="flex-1 gap-2 rounded-xl text-gray-600 hover:text-gray-900 shadow-sm bg-white">
                     <a href={lead.website} target="_blank" rel="noopener noreferrer">
-                      <Globe className="h-3.5 w-3.5" /> Website
+                      <Globe className="h-4 w-4" /> Website
                     </a>
                   </Button>
                 )}
                 {lead.phone && (
-                  <Button variant="outline" size="sm" asChild className="flex-1 gap-1">
+                  <Button variant="outline" size="sm" asChild className="flex-1 gap-2 rounded-xl text-gray-600 hover:text-gray-900 shadow-sm bg-white">
                     <a href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer">
-                      <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                      <MessageCircle className="h-4 w-4" /> WhatsApp
                     </a>
                   </Button>
                 )}
@@ -284,25 +285,25 @@ export default function LeadDetailPage() {
           </Card>
 
           {/* Additional Data */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Additional Info</CardTitle>
+          <Card className="border-0 shadow-sm rounded-2xl bg-white overflow-hidden">
+            <CardHeader className="bg-gray-50/50 border-b border-gray-100 pb-4">
+              <CardTitle className="text-xs font-bold text-gray-500 uppercase tracking-wider">Additional Info</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-3">
+            <CardContent className="space-y-4 pt-6">
+              <div className="flex items-center gap-4">
                 <Tag className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-500 w-16">Niche</span>
+                <span className="text-sm text-gray-500 w-20">Niche</span>
                 {isEditing ? (
-                  <Input value={editForm.niche} onChange={(e) => setEditForm({ ...editForm, niche: e.target.value })} className="flex-1" />
+                  <Input value={editForm.niche} onChange={(e) => setEditForm({ ...editForm, niche: e.target.value })} className="flex-1 rounded-xl bg-gray-50" />
                 ) : (
                   <span className="text-sm font-medium text-gray-900">{lead.niche || "—"}</span>
                 )}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 <Star className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-500 w-16">Rating</span>
+                <span className="text-sm text-gray-500 w-20">Rating</span>
                 {isEditing ? (
-                  <Input value={editForm.rating} onChange={(e) => setEditForm({ ...editForm, rating: e.target.value })} className="flex-1" type="number" step="0.1" min="0" max="5" />
+                  <Input value={editForm.rating} onChange={(e) => setEditForm({ ...editForm, rating: e.target.value })} className="flex-1 rounded-xl bg-gray-50" type="number" step="0.1" min="0" max="5" />
                 ) : (
                   <span className="text-sm font-medium text-gray-900">
                     {lead.rating ? `${lead.rating} ⭐` : "—"}
@@ -310,14 +311,14 @@ export default function LeadDetailPage() {
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 <User className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-500 w-16">Assigned</span>
+                <span className="text-sm text-gray-500 w-20">Assigned</span>
                 <span className="text-sm font-medium text-gray-900">{lead.assignedToName || "Unassigned"}</span>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 <User className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-500 w-16">Added by</span>
+                <span className="text-sm text-gray-500 w-20">Added by</span>
                 <span className="text-sm font-medium text-gray-900">{lead.uploadedByName || "—"}</span>
               </div>
             </CardContent>
@@ -327,43 +328,44 @@ export default function LeadDetailPage() {
         {/* Right Column */}
         <div className="lg:col-span-2 space-y-4">
           {/* Log Activity */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Log Activity</CardTitle>
+          <Card className="border-0 shadow-sm rounded-2xl bg-white overflow-hidden">
+            <CardHeader className="bg-gray-50/50 border-b border-gray-100 pb-4">
+              <CardTitle className="text-xs font-bold text-gray-500 uppercase tracking-wider">Log Activity</CardTitle>
             </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="note">
-                <TabsList className="w-full">
-                  <TabsTrigger value="note" className="flex-1">Note</TabsTrigger>
-                  <TabsTrigger value="call" className="flex-1">Log Call</TabsTrigger>
-                  <TabsTrigger value="follow-up" className="flex-1">Follow Up</TabsTrigger>
+            <CardContent className="pt-6">
+              <Tabs defaultValue="note" className="w-full">
+                <TabsList className="w-full bg-gray-100/80 rounded-xl p-1">
+                  <TabsTrigger value="note" className="flex-1 rounded-lg text-sm">Note</TabsTrigger>
+                  <TabsTrigger value="call" className="flex-1 rounded-lg text-sm">Log Call</TabsTrigger>
+                  <TabsTrigger value="follow-up" className="flex-1 rounded-lg text-sm">Follow Up</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="note" className="space-y-3 mt-4">
+                <TabsContent value="note" className="space-y-4 mt-6">
                   <Textarea
                     value={noteContent}
                     onChange={(e) => setNoteContent(e.target.value)}
                     placeholder="Write a note..."
                     rows={4}
+                    className="rounded-xl bg-gray-50/50 resize-none"
                   />
-                  <Button onClick={handleAddNote} disabled={!noteContent.trim()}>
+                  <Button onClick={handleAddNote} disabled={!noteContent.trim()} className="w-full sm:w-auto rounded-xl shadow-sm">
                     Add Note
                   </Button>
                 </TabsContent>
 
-                <TabsContent value="call" className="space-y-3 mt-4">
-                  <div className="space-y-1.5">
-                    <Label>Outcome</Label>
+                <TabsContent value="call" className="space-y-4 mt-6">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Outcome</Label>
                     <Select value={callOutcome} onValueChange={setCallOutcome}>
-                      <SelectTrigger>
+                      <SelectTrigger className="rounded-xl bg-gray-50/50">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="interested">Interested</SelectItem>
-                        <SelectItem value="not_interested">Not Interested</SelectItem>
-                        <SelectItem value="no_answer">No Answer</SelectItem>
-                        <SelectItem value="callback">Callback Requested</SelectItem>
-                        <SelectItem value="voicemail">Voicemail</SelectItem>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="interested" className="rounded-lg m-1">Interested</SelectItem>
+                        <SelectItem value="not_interested" className="rounded-lg m-1">Not Interested</SelectItem>
+                        <SelectItem value="no_answer" className="rounded-lg m-1">No Answer</SelectItem>
+                        <SelectItem value="callback" className="rounded-lg m-1">Callback Requested</SelectItem>
+                        <SelectItem value="voicemail" className="rounded-lg m-1">Voicemail</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -372,19 +374,20 @@ export default function LeadDetailPage() {
                     onChange={(e) => setCallNotes(e.target.value)}
                     placeholder="Call notes..."
                     rows={3}
+                    className="rounded-xl bg-gray-50/50 resize-none"
                   />
-                  <Button onClick={handleLogCall}>Save Call Log</Button>
+                  <Button onClick={handleLogCall} className="w-full sm:w-auto rounded-xl shadow-sm">Save Call Log</Button>
                 </TabsContent>
 
-                <TabsContent value="follow-up" className="space-y-3 mt-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label>Date</Label>
-                      <Input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} />
+                <TabsContent value="follow-up" className="space-y-4 mt-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Date</Label>
+                      <Input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} className="rounded-xl bg-gray-50/50" />
                     </div>
-                    <div className="space-y-1.5">
-                      <Label>Time</Label>
-                      <Input type="time" value={followUpTime} onChange={(e) => setFollowUpTime(e.target.value)} />
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Time</Label>
+                      <Input type="time" value={followUpTime} onChange={(e) => setFollowUpTime(e.target.value)} className="rounded-xl bg-gray-50/50" />
                     </div>
                   </div>
                   <Textarea
@@ -392,44 +395,56 @@ export default function LeadDetailPage() {
                     onChange={(e) => setFollowUpNotes(e.target.value)}
                     placeholder="Follow-up details..."
                     rows={3}
+                    className="rounded-xl bg-gray-50/50 resize-none"
                   />
-                  <Button onClick={handleFollowUp}>Create Reminder</Button>
+                  <Button onClick={handleFollowUp} className="w-full sm:w-auto rounded-xl shadow-sm">Create Reminder</Button>
                 </TabsContent>
               </Tabs>
             </CardContent>
           </Card>
 
           {/* Activity Timeline */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Activity Timeline</CardTitle>
+          <Card className="border-0 shadow-sm rounded-2xl bg-white overflow-hidden">
+            <CardHeader className="bg-gray-50/50 border-b border-gray-100 pb-4">
+              <CardTitle className="text-xs font-bold text-gray-500 uppercase tracking-wider">Activity Timeline</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               {leadActivities.length === 0 ? (
-                <p className="text-sm text-gray-400 py-8 text-center">No activity recorded yet</p>
+                <p className="text-sm text-gray-400 py-8 text-center italic">No activity recorded yet</p>
               ) : (
                 <div className="relative">
                   {/* Timeline line */}
-                  <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
+                  <div className="absolute left-5 top-0 bottom-0 w-[2px] bg-gradient-to-b from-gray-100 via-gray-100 to-transparent" />
 
-                  <div className="space-y-6">
+                  <div className="space-y-8">
                     {leadActivities.map((act) => (
-                      <div key={act.id} className="relative flex items-start gap-4 pl-1">
-                        <div className={`relative z-10 h-8 w-8 rounded-full flex items-center justify-center text-white flex-shrink-0 ${activityColors[act.type] || activityColors.system}`}>
-                          {activityIcons[act.type] || activityIcons.system}
+                      <div key={act.id} className="relative flex items-start gap-4">
+                        <div className={`relative z-10 h-10 w-10 p-0.5 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm border border-gray-50`}>
+                           <div className={`h-full w-full rounded-full flex items-center justify-center text-white ${activityColors[act.type] || activityColors.system}`}>
+                              {activityIcons[act.type] || activityIcons.system}
+                           </div>
                         </div>
-                        <div className="flex-1 min-w-0 pt-0.5">
+                        <div className="flex-1 min-w-0 pt-1.5">
                           <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-gray-900 capitalize">{act.type.replace("-", " ")}</p>
-                            <span className="text-xs text-gray-400">{formatTimeAgo(act.date)}</span>
+                            <p className="text-sm font-semibold text-gray-900 capitalize">{act.type.replace("-", " ")}</p>
+                            <span className="text-xs font-medium text-gray-400">{formatTimeAgo(act.date)}</span>
                           </div>
-                          <p className="text-sm text-gray-600 mt-0.5">{act.content}</p>
-                          {act.outcome && (
-                            <Badge variant="secondary" className="mt-1 text-[10px]">
-                              Outcome: {act.outcome}
-                            </Badge>
+                          {act.content && (
+                            <div className="mt-2 text-sm text-gray-600 bg-gray-50 rounded-xl p-3 border border-gray-100/50 leading-relaxed shadow-[inset_0_1px_2px_rgba(0,0,0,0.01)]">
+                              {act.content}
+                            </div>
                           )}
-                          <p className="text-xs text-gray-400 mt-1">by {act.user}</p>
+                          <div className="mt-3 flex items-center gap-2">
+                             <div className="h-5 w-5 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[9px] font-bold text-indigo-700">
+                                {act.user?.[0]?.toUpperCase() || "?"}
+                             </div>
+                             <p className="text-[11px] font-medium text-gray-500">{act.user}</p>
+                             {act.outcome && (
+                              <Badge variant="outline" className="ml-auto text-[10px] font-semibold text-gray-600 border-gray-200 uppercase tracking-wider bg-white">
+                                {act.outcome}
+                              </Badge>
+                             )}
+                          </div>
                         </div>
                       </div>
                     ))}

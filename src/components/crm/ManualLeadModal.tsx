@@ -80,107 +80,117 @@ export function ManualLeadModal({ open, onClose }: ManualLeadModalProps) {
           <DialogDescription>Enter lead information manually</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2 space-y-1.5">
-              <Label>Business Name *</Label>
+        <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 space-y-2">
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Business Name *</Label>
               <Input
                 value={form.businessName}
                 onChange={(e) => updateField("businessName", e.target.value)}
                 placeholder="Enter business name"
                 required
+                className="rounded-xl bg-gray-50/50"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Phone</Label>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Phone</Label>
               <Input
                 value={form.phone}
                 onChange={(e) => updateField("phone", e.target.value)}
                 placeholder="+1-555-0000"
+                className="rounded-xl bg-gray-50/50"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>WhatsApp</Label>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">WhatsApp</Label>
               <Input
                 value={form.whatsapp}
                 onChange={(e) => updateField("whatsapp", e.target.value)}
                 placeholder="WhatsApp number"
+                className="rounded-xl bg-gray-50/50"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Email</Label>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Email</Label>
               <Input
                 type="email"
                 value={form.email}
                 onChange={(e) => updateField("email", e.target.value)}
                 placeholder="email@example.com"
+                className="rounded-xl bg-gray-50/50"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Website</Label>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Website</Label>
               <Input
                 value={form.website}
                 onChange={(e) => updateField("website", e.target.value)}
                 placeholder="https://..."
+                className="rounded-xl bg-gray-50/50"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Instagram</Label>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Instagram</Label>
               <Input
                 value={form.instagramLink}
                 onChange={(e) => updateField("instagramLink", e.target.value)}
                 placeholder="Instagram link"
+                className="rounded-xl bg-gray-50/50"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Google Maps Link</Label>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Google Maps Link</Label>
               <Input
                 value={form.mapsLink}
                 onChange={(e) => updateField("mapsLink", e.target.value)}
                 placeholder="Maps link"
+                className="rounded-xl bg-gray-50/50"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Address</Label>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Address</Label>
               <Input
                 value={form.address}
                 onChange={(e) => updateField("address", e.target.value)}
                 placeholder="Address"
+                className="rounded-xl bg-gray-50/50"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Niche</Label>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Niche</Label>
               <Input
                 value={form.niche}
                 onChange={(e) => updateField("niche", e.target.value)}
                 placeholder="e.g. Dentist, Plumber"
+                className="rounded-xl bg-gray-50/50"
               />
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Notes</Label>
+          <div className="space-y-2 border-t border-gray-100 pt-4">
+            <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Notes</Label>
             <Textarea
               value={form.manualNotes}
               onChange={(e) => updateField("manualNotes", e.target.value)}
               placeholder="Any additional notes..."
-              rows={3}
+              rows={4}
+              className="rounded-xl bg-gray-50/50 resize-none"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-xl h-11 px-6 font-bold">
               Cancel
             </Button>
-            <Button type="submit">Add Lead</Button>
+            <Button type="submit" className="rounded-xl shadow-sm h-11 px-8 font-bold">Add Lead</Button>
           </div>
         </form>
       </DialogContent>

@@ -174,31 +174,33 @@ export function ExcelUploadModal({ open, onClose }: ExcelUploadModalProps) {
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
-          className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
-            dragOver ? "border-indigo-400 bg-indigo-50" : "border-gray-200 bg-gray-50"
+          className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors ${
+            dragOver ? "border-indigo-400 bg-indigo-50" : "border-gray-200 bg-gray-50/50 hover:bg-gray-50"
           }`}
         >
           {file ? (
-            <div className="flex items-center justify-center gap-3">
-              <FileSpreadsheet className="h-8 w-8 text-green-600" />
-              <div className="text-left">
-                <p className="text-sm font-medium text-gray-900">{file.name}</p>
-                <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</p>
+            <div className="flex items-center justify-center gap-3 bg-white p-3 rounded-xl border shadow-sm">
+              <FileSpreadsheet className="h-8 w-8 text-emerald-500" />
+              <div className="text-left flex-1 min-w-0">
+                <p className="text-sm font-bold text-gray-900 truncate">{file.name}</p>
+                <p className="text-xs font-medium text-gray-500">{(file.size / 1024).toFixed(1)} KB</p>
               </div>
               <button
                 onClick={() => setFile(null)}
-                className="ml-2 p-1 rounded-full hover:bg-gray-200"
+                className="ml-2 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
               >
-                <X className="h-4 w-4 text-gray-500" />
+                <X className="h-4 w-4" />
               </button>
             </div>
           ) : (
             <div>
-              <Upload className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-              <p className="text-sm text-gray-600 mb-1">Drag & drop your Excel file here</p>
-              <p className="text-xs text-gray-400 mb-3">or</p>
+              <div className="mx-auto w-12 h-12 rounded-2xl bg-white border shadow-sm flex items-center justify-center mb-4">
+                <Upload className="h-6 w-6 text-gray-400" />
+              </div>
+              <p className="text-sm font-bold text-gray-700 mb-1">Drag & drop your Excel file here</p>
+              <p className="text-xs font-medium text-gray-400 mb-4">or</p>
               <label className="cursor-pointer">
-                <span className="px-4 py-2 bg-white border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                <span className="px-5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all">
                   Browse Files
                 </span>
                 <input
@@ -213,18 +215,18 @@ export function ExcelUploadModal({ open, onClose }: ExcelUploadModalProps) {
         </div>
 
         {/* Niche & Location */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label>Niche</Label>
-            <Input value={niche} onChange={(e) => setNiche(e.target.value)} placeholder="e.g. Plumber" />
+        <div className="grid grid-cols-2 gap-4 mt-2">
+          <div className="space-y-2">
+            <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Niche</Label>
+            <Input value={niche} onChange={(e) => setNiche(e.target.value)} placeholder="e.g. Plumber" className="rounded-xl bg-gray-50/50" />
           </div>
-          <div className="space-y-1.5">
-            <Label>Location</Label>
-            <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Downtown" />
+          <div className="space-y-2">
+            <Label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Location</Label>
+            <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Downtown" className="rounded-xl bg-gray-50/50" />
           </div>
         </div>
 
-        <Button onClick={handleUpload} disabled={!file || isUploading} className="w-full">
+        <Button onClick={handleUpload} disabled={!file || isUploading} className="w-full rounded-xl shadow-sm h-11 mt-2 font-bold select-none">
           {isUploading ? (
             <span className="flex items-center gap-2">
               <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
