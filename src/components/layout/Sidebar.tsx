@@ -13,6 +13,7 @@ import {
   ChevronRight,
   LogOut,
   X,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -21,6 +22,7 @@ const navItems = [
   { name: "View Website", path: "https://webkid-ai.netlify.app/", icon: ExternalLink, external: true },
   { name: "Dashboard", path: "/crm", icon: LayoutDashboard },
   { name: "Leads", path: "/crm/leads", icon: Users },
+  { name: "Website Leads", path: "/crm/website-leads", icon: Globe },
   { name: "Follow-ups", path: "/crm/follow-ups", icon: Calendar },
   { name: "Settings", path: "/crm/settings", icon: Settings, adminOnly: true },
 ];
