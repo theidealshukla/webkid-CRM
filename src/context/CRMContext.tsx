@@ -207,6 +207,20 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         newAppLead.lastActivity = "Just now";
         setLeads(prev => [newAppLead, ...prev]);
         addLog("Created Lead", "lead", data.id, newAppLead.businessName);
+
+        // If manual notes exist, also create an actual Activity so it shows in timeline
+        if (lead.manualNotes?.trim()) {
+          const { data: actData } = await supabase.from("activities").insert([{
+            lead_id: data.id,
+            user_id: user?.id || null,
+            type: "note",
+            content: lead.manualNotes
+          }]).select().single();
+
+          if (actData) {
+            setActivities(prev => [mapActivityRow(actData, idToNameMap), ...prev]);
+          }
+        }
       }
     } catch (e: any) {
       console.error("Add lead error:", e);
