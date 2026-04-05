@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/context/AuthContext";
 import { Shield } from "lucide-react";
+import UserManagement from "@/components/settings/UserManagement";
 
 export default function SettingsPage() {
   const { user, teamMembers } = useAuth();
@@ -22,6 +23,8 @@ export default function SettingsPage() {
       return () => window.removeEventListener("avatarUpdated", loadAvatar);
     }
   }, [user?.id]);
+
+  const isAdmin = user?.role === "admin";
 
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl">
@@ -81,6 +84,13 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* User Management — Admin Only */}
+      {isAdmin && (
+        <div className="animate-fade-in">
+          <UserManagement />
+        </div>
+      )}
     </div>
   );
 }
