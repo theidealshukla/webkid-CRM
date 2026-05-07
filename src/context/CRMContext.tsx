@@ -193,7 +193,10 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         status: lead.status || "new",
         source: lead.source || "manual",
         lead_source_detail: lead.leadSourceDetail || null,
-        assigned_to: lead.assignedTo ? nameToIdMap.get(lead.assignedTo) || lead.assignedTo || null : null,
+        // Default assignee to the creator if none specified — no "Unassigned" state.
+        assigned_to: (lead.assignedTo
+          ? nameToIdMap.get(lead.assignedTo) || lead.assignedTo
+          : user?.id) || null,
         batch_id: lead.batchId || null,
         uploaded_by: user?.id || null,
         manual_notes: lead.manualNotes || null,
@@ -411,7 +414,8 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
           review_count: lead.reviewCount || null,
           status: lead.status || "new",
           source: lead.source || "excel",
-          assigned_to: lead.assignedTo ? nameToIdMap.get(lead.assignedTo) || null : null,
+          // Batch-uploaded leads are auto-assigned to the uploader. No "Unassigned" state.
+          assigned_to: user?.id || (lead.assignedTo ? nameToIdMap.get(lead.assignedTo) || null : null),
           batch_id: batchData.id,
           uploaded_by: user?.id || null,
           manual_notes: lead.manualNotes || null
