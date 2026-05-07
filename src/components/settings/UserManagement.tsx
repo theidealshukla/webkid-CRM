@@ -131,58 +131,37 @@ export default function UserManagement() {
     setAddStatus(null);
 
     try {
-      // 1. Create auth user via Supabase Auth signUp
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newEmail,
-        password: newPassword,
-        options: {
-          data: { name: newName || newEmail.split("@")[0] },
+      // Create user via secured server route — preserves the admin's session
+      // and uses the service-role key (bypasses RLS, auto-confirms email).
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setAddStatus({ type: "error", text: "Not signed in." });
+        return;
+      }
+
+      const res = await fetch("/api/admin/create-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
         },
+        body: JSON.stringify({
+          email: newEmail,
+          password: newPassword,
+          name: newName,
+          role: newRole,
+        }),
       });
 
-      if (authError) {
-        setAddStatus({ type: "error", text: authError.message });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAddStatus({ type: "error", text: json.error || `Failed (${res.status})` });
         return;
-      }
-
-      if (!authData.user) {
-        setAddStatus({
-          type: "error",
-          text: "Failed to create auth user. Try again.",
-        });
-        return;
-      }
-
-      // 2. Insert profile into public.users table
-      const { error: profileError } = await supabase.from("users").insert([
-        {
-          id: authData.user.id,
-          email: newEmail,
-          name: newName || newEmail.split("@")[0],
-          role: newRole,
-        },
-      ]);
-
-      if (profileError) {
-        // Profile might already exist if signUp triggers a DB function
-        if (profileError.code === "23505") {
-          // Duplicate key — update the role instead
-          await supabase
-            .from("users")
-            .update({ role: newRole, name: newName || newEmail.split("@")[0] })
-            .eq("id", authData.user.id);
-        } else {
-          setAddStatus({
-            type: "warning",
-            text: `Auth user created, but profile insert failed: ${profileError.message}`,
-          });
-          return;
-        }
       }
 
       setAddStatus({
         type: "success",
-        text: `User "${newName || newEmail}" created successfully as ${newRole}.`,
+        text: json.message || `User "${newName || newEmail}" created as ${newRole}.`,
       });
 
       // Reset form

@@ -56,15 +56,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error("fetchUserProfile error:", e);
       
-      // HARD FALLBACK: If Supabase stalls or DB query fails, we STILL log them in!
-      // This guarantees the dashboard loads instantly even if the database network locks up.
+      // HARD FALLBACK: keep the UI alive on transient DB failures, but DO NOT grant admin.
+      // Granting admin on a network failure is a privilege-escalation footgun.
       if (email && id) {
-        console.warn("Using offline fallback profile generation to prevent UI freeze.");
+        console.warn("Using offline fallback profile (member role) to prevent UI freeze.");
         return {
           id: id,
           email: email,
           name: name,
-          role: "admin", // Fallback to admin to prevent getting locked out of features
+          role: "member",
         };
       }
       return null;
@@ -235,7 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: newId,
             email: profileByEmail.email,
             name: profileByEmail.name || email.split("@")[0],
-            role: profileByEmail.role || "admin", // Fallback to admin if it's the first time linking
+            role: profileByEmail.role || "member", // default to member; grant admin explicitly
           }]);
         } else {
           // No profile at all, create a brand new one
@@ -243,7 +243,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: data.user.id,
             email: email,
             name: email.split("@")[0],
-            role: "admin", // Make them admin since they had valid auth credentials
+            role: "member", // default to member; admin must be granted by another admin
           }]);
         }
         

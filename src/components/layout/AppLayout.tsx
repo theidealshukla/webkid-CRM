@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { ExcelUploadModal } from "@/components/crm/ExcelUploadModal";
@@ -8,15 +9,16 @@ import { ManualLeadModal } from "@/components/crm/ManualLeadModal";
 import { cn } from "@/lib/utils";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile overlay
   const [showAddLead, setShowAddLead] = useState(false);
   const [showUploadExcel, setShowUploadExcel] = useState(false);
 
-  // Auto-close mobile sidebar on route change (handled by children re-render)
+  // Close mobile sidebar on route change (don't depend on children — re-runs on every render).
   useEffect(() => {
     setSidebarOpen(false);
-  }, [children]);
+  }, [pathname]);
 
   return (
     <div className="min-h-screen bg-gray-50/30">

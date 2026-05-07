@@ -85,7 +85,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         supabase.from("leads").select("*").order("created_at", { ascending: false }),
         supabase.from("activities").select("*").order("created_at", { ascending: false }),
         supabase.from("upload_batches").select("*").order("created_at", { ascending: false }),
-        supabase.from("activity_logs").select("*").order("created_at", { ascending: false })
+        supabase.from("activity_logs").select("*").order("created_at", { ascending: false }).limit(200)
       ]);
 
       if (leadsRes.error) throw leadsRes.error;
@@ -93,23 +93,24 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
       if (batchesRes.error) throw batchesRes.error;
       if (logsRes.error) throw logsRes.error;
 
-      // Map rows to App interfaces
+      // Build lead_id -> latest activity timestamp once (O(N+M) instead of O(N*M)).
+      // Activities are already sorted DESC by created_at, so the first hit is the latest.
+      const latestActivityByLead = new Map<string, string>();
+      (activitiesRes.data as ActivityRow[]).forEach(a => {
+        if (!latestActivityByLead.has(a.lead_id)) {
+          latestActivityByLead.set(a.lead_id, a.created_at);
+        }
+      });
+
       const mappedLeads = (leadsRes.data as LeadRow[]).map(r => {
         const lead = mapLeadRow(r, namesMap);
-        
-        // Compute lastActivity directly during mapping
-        const leadActivities = (activitiesRes.data as ActivityRow[]).filter(a => a.lead_id === r.id);
-        if (leadActivities.length > 0) {
-           const latest = leadActivities[0].created_at;
-           lead.lastActivity = formatTimeAgo(latest);
-        } else {
-           lead.lastActivity = formatTimeAgo(r.created_at);
-        }
-        
+        const latest = latestActivityByLead.get(r.id) ?? r.created_at;
+        lead.lastActivity = formatTimeAgo(latest);
+
         // Handle is_archived gracefully — column may not exist yet
         const rawRow = r as unknown as Record<string, unknown>;
         lead.isArchived = rawRow.is_archived === true;
-        
+
         return lead;
       });
       
