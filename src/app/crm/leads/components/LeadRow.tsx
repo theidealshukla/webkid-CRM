@@ -269,6 +269,7 @@ const MobileLeadCard = React.memo(function MobileLeadCard({
   onAssign,
   onArchive,
   onDelete,
+  onConvertToClient,
   teamMembers,
 }: Omit<LeadRowProps, "index">) {
   const [actionDialog, setActionDialog] = useState<{
@@ -353,6 +354,11 @@ const MobileLeadCard = React.memo(function MobileLeadCard({
               <DropdownMenuItem onClick={() => setActionDialog({ open: true, tab: "follow-up" })} className="gap-2">
                 <CalendarPlus className="h-4 w-4" /> Set Follow-up
               </DropdownMenuItem>
+              {onConvertToClient && (
+                <DropdownMenuItem onClick={() => onConvertToClient(lead.id)} className="gap-2 text-emerald-600">
+                  <Briefcase className="h-4 w-4" /> Convert to Client
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onArchive(lead.id)} className="gap-2 text-amber-600">
                 <Archive className="h-4 w-4" /> Archive Lead

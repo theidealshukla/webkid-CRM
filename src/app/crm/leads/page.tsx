@@ -492,6 +492,7 @@ export default function LeadsPage() {
                 onAssign={handleAssign}
                 onArchive={handleArchive}
                 onDelete={handleDelete}
+                onConvertToClient={handleSingleConvert}
                 teamMembers={teamNames}
               />
             ))}
@@ -529,6 +530,58 @@ export default function LeadsPage() {
       )}
         </div>
       )}
+
+      {/* Sticky Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white rounded-2xl shadow-2xl border border-gray-200 px-4 py-3 flex items-center gap-3 animate-in slide-in-from-bottom-4">
+          <span className="text-sm font-semibold text-gray-900">
+            {selectedIds.size} selected
+          </span>
+          <div className="h-6 w-px bg-gray-200" />
+          <Button size="sm" variant="default" onClick={handleBulkConvert} className="bg-emerald-600 hover:bg-emerald-700 gap-2">
+            <Briefcase className="h-4 w-4" /> Convert to Client
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline">Assign to…</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {teamNames.map(name => (
+                <DropdownMenuItem key={name} onClick={() => handleBulkAssign(name)}>{name}</DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline">Status…</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {ALL_STATUSES.map(s => (
+                <DropdownMenuItem key={s} onClick={() => handleBulkStatus(s)}>
+                  <span className={`h-2 w-2 rounded-full mr-2 ${statusConfig[s].dot}`} />
+                  {statusConfig[s].label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button size="sm" variant="outline" onClick={handleBulkArchive} className="text-amber-700 gap-2">
+            <Archive className="h-4 w-4" /> Archive
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleBulkDelete} className="text-red-700 gap-2">
+            <Trash2 className="h-4 w-4" /> Delete
+          </Button>
+          <button onClick={clearSelection} className="ml-2 text-gray-400 hover:text-gray-700" aria-label="Clear">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      <ConvertToClientModal
+        open={convertModal.open}
+        onClose={() => setConvertModal({ open: false, ids: [] })}
+        count={convertModal.ids.length}
+        onConfirm={onConvertConfirm}
+      />
     </div>
   );
 }

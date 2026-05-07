@@ -20,6 +20,7 @@ import {
   ArrowUpRight,
   Sparkles,
   Trash2,
+  Briefcase,
 } from "lucide-react";
 
 import Link from "next/link";
@@ -46,13 +47,15 @@ export default function DashboardPage() {
     const contacted = activeLeads.filter((l) => l.status === "contacted").length;
     const followUps = activeLeads.filter((l) => l.status === "follow_up").length;
     const closedWon = activeLeads.filter((l) => l.status === "closed_won").length;
+    const totalClients = leads.filter(l => l.isClient && !l.isArchived).length;
     return [
       { title: "Total Leads", value: total, icon: Users, color: "text-blue-600", bg: "bg-blue-50", ring: "ring-blue-100" },
       { title: "Contacted", value: contacted, icon: Phone, color: "text-indigo-600", bg: "bg-indigo-50", ring: "ring-indigo-100" },
       { title: "Follow-ups", value: followUps, icon: Calendar, color: "text-amber-600", bg: "bg-amber-50", ring: "ring-amber-100" },
       { title: "Closed Won", value: closedWon, icon: Trophy, color: "text-emerald-600", bg: "bg-emerald-50", ring: "ring-emerald-100" },
+      { title: "Active Clients", value: totalClients, icon: Briefcase, color: "text-emerald-600", bg: "bg-emerald-50", ring: "ring-emerald-100" },
     ];
-  }, [activeLeads]);
+  }, [activeLeads, leads]);
 
 
 
@@ -117,7 +120,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Cards - Compact */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (

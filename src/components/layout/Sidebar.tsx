@@ -15,6 +15,7 @@ import {
   X,
   Globe,
   UserPlus,
+  Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -23,6 +24,7 @@ const navItems = [
   { name: "View Website", path: "https://webkid-ai.netlify.app/", icon: ExternalLink, external: true },
   { name: "Dashboard", path: "/crm", icon: LayoutDashboard },
   { name: "Leads", path: "/crm/leads", icon: Users },
+  { name: "Our Clients", path: "/crm/clients", icon: Briefcase },
   { name: "Manual Leads", path: "/crm/manual-leads", icon: UserPlus },
   { name: "Website Leads", path: "/crm/website-leads", icon: Globe },
   { name: "Follow-ups", path: "/crm/follow-ups", icon: Calendar },
