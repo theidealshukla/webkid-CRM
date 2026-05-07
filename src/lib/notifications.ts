@@ -8,6 +8,8 @@ import {
   reminderSetEmail,
   reminderDueEmail,
   clientConvertedEmail,
+  websiteLeadAdminEmail,
+  websiteLeadUserEmail,
 } from "./emailTemplates";
 
 const APP_URL = process.env.APP_URL || "https://crm.webkid.in";
@@ -57,7 +59,7 @@ async function logSend(opts: {
   entityType: string;
   entityId: string;
   recipient: string;
-  userId: string;
+  userId: string | null;
   messageId?: string;
   error?: string;
 }) {
@@ -293,6 +295,69 @@ export async function notifyClientConverted(leadId: string, convertedById: strin
       clientUrl: `${APP_URL}/crm/clients`,
     }),
   });
+}
+
+export async function notifyWebsiteLeadCreated(leadId: string) {
+  const supabase = getServiceClient();
+  const { data: lead } = await supabase
+    .from("website_leads")
+    .select("id, name, phone, email, message, created_at")
+    .eq("id", leadId)
+    .single();
+  if (!lead) return { sent: 0, skipped: 0, reason: "lead-not-found" };
+
+  const submittedAt = new Date(lead.created_at as string).toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Kolkata",
+  });
+  const leadUrl = `${APP_URL}/crm/website-leads`;
+
+  // ── Admin fan-out: notify every team member ─────────────────────────
+  const recipients = await getAllTeamMembers();
+  const adminResult = await fanOut({
+    kind: "website_lead_created",
+    entityType: "website_lead",
+    entityId: leadId,
+    recipients,
+    build: (u) => websiteLeadAdminEmail({
+      recipientName: u.name,
+      leadName: lead.name as string,
+      phone: lead.phone as string,
+      email: (lead.email as string | null) || null,
+      message: (lead.message as string | null) || null,
+      submittedAt,
+      leadUrl,
+    }),
+  });
+
+  // ── User confirmation (only if they gave us an email) ───────────────
+  let userResult = { sent: 0, skipped: 0 };
+  const userEmail = (lead.email as string | null)?.trim();
+  if (userEmail) {
+    if (!(await alreadySent("website_lead_user_confirmation", leadId, userEmail))) {
+      const { subject, html } = websiteLeadUserEmail({ name: lead.name as string });
+      const result = await sendEmail({ to: userEmail, subject, html });
+      await logSend({
+        kind: "website_lead_user_confirmation",
+        entityType: "website_lead",
+        entityId: leadId,
+        recipient: userEmail,
+        userId: null,
+        messageId: result.id,
+        error: result.error,
+      });
+      if (result.error) userResult = { sent: 0, skipped: 1 };
+      else userResult = { sent: 1, skipped: 0 };
+    } else {
+      userResult = { sent: 0, skipped: 1 };
+    }
+  }
+
+  return {
+    sent: adminResult.sent + userResult.sent,
+    skipped: adminResult.skipped + userResult.skipped,
+  };
 }
 
 export async function notifyReminderDue(activityId: string, when: "today" | "tomorrow") {

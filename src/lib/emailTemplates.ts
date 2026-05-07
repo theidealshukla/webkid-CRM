@@ -296,6 +296,115 @@ export function clientConvertedEmail(opts: {
   return { subject: `\u{1F389} New client: ${opts.leadName}`, html };
 }
 
+// ── Public layout (for emails sent to non-team recipients) ─────────────
+// Same brand shell, but no "you're on the team" footer or CRM links.
+function publicLayout(opts: {
+  preview: string;
+  eyebrow: string;
+  heading: string;
+  body: string;
+  meta?: Array<{ label: string; value: string }>;
+}): string {
+  const metaHtml = opts.meta?.length
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:24px 0 0;border-collapse:collapse;background:#f9fafb;border-radius:12px;">
+        ${opts.meta.map(m => `
+          <tr>
+            <td style="padding:10px 16px;font-size:12px;color:${BRAND.muted};font-weight:600;text-transform:uppercase;letter-spacing:0.5px;width:40%;">${escape(m.label)}</td>
+            <td style="padding:10px 16px;font-size:14px;color:${BRAND.text};font-weight:500;text-align:right;">${escape(m.value)}</td>
+          </tr>`).join("")}
+       </table>`
+    : "";
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${escape(opts.preview)}</title>
+</head>
+<body style="margin:0;padding:0;background:${BRAND.bg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;-webkit-font-smoothing:antialiased;">
+  <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;mso-hide:all;">${escape(opts.preview)}</span>
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:${BRAND.bg};">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="560" style="max-width:560px;background:${BRAND.card};border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,0.04),0 0 0 1px rgba(15,23,42,0.04);overflow:hidden;">
+          <tr>
+            <td style="padding:32px 32px 0;">
+              <span style="display:inline-block;font-size:20px;font-weight:800;letter-spacing:-0.02em;color:${BRAND.text};">webkid<span style="color:${BRAND.primary};">.</span></span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 32px 0;">
+              <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:${BRAND.primary};">${escape(opts.eyebrow)}</p>
+              <h1 style="margin:8px 0 16px;font-size:22px;line-height:1.3;font-weight:700;color:${BRAND.text};letter-spacing:-0.01em;">${opts.heading}</h1>
+              <div style="font-size:15px;line-height:1.6;color:#374151;">${opts.body}</div>
+              ${metaHtml}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              <hr style="border:0;border-top:1px solid ${BRAND.border};margin:0 0 16px;">
+              <p style="margin:0;font-size:12px;line-height:1.6;color:${BRAND.subtle};">
+                Webkid &middot; web design &amp; development<br>
+                <a href="https://www.webkid.me" style="color:${BRAND.primary};text-decoration:none;font-weight:600;">webkid.me</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p style="margin:16px 0 0;font-size:11px;color:${BRAND.subtle};">© ${new Date().getFullYear()} Webkid</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+// ── Website lead templates ─────────────────────────────────────────────
+
+export function websiteLeadAdminEmail(opts: {
+  recipientName: string;
+  leadName: string;
+  phone: string;
+  email?: string | null;
+  message?: string | null;
+  submittedAt: string;
+  leadUrl: string;
+}): { subject: string; html: string } {
+  const messageBlock = opts.message
+    ? `<blockquote style="margin:20px 0 0;padding:14px 16px;background:#f9fafb;border-left:3px solid ${BRAND.primary};border-radius:6px;font-size:14px;line-height:1.6;color:#374151;white-space:pre-wrap;">${escape(opts.message)}</blockquote>`
+    : `<p style="margin:18px 0 0;font-size:13px;color:${BRAND.subtle};font-style:italic;">No message provided.</p>`;
+
+  const html = layout({
+    preview: `New website inquiry from ${opts.leadName}`,
+    eyebrow: "Website Inquiry",
+    heading: `Hi ${escape(firstName(opts.recipientName))}, a new website lead just came in.`,
+    body: `<p style="margin:0;">
+      <strong style="color:${BRAND.text};">${escape(opts.leadName)}</strong> just submitted the contact form on webkid.me.
+    </p>${messageBlock}`,
+    meta: [
+      { label: "Phone", value: opts.phone },
+      ...(opts.email ? [{ label: "Email", value: opts.email }] : []),
+      { label: "Submitted", value: opts.submittedAt },
+    ],
+    cta: { label: "Open in CRM", href: opts.leadUrl },
+  });
+  return { subject: `New website lead: ${opts.leadName}`, html };
+}
+
+export function websiteLeadUserEmail(opts: {
+  name: string;
+}): { subject: string; html: string } {
+  const html = publicLayout({
+    preview: "We got your message — we'll be in touch soon.",
+    eyebrow: "Message Received",
+    heading: `Thanks for reaching out, ${escape(firstName(opts.name))}.`,
+    body: `<p style="margin:0 0 14px;">We&rsquo;ve received your message and someone from our team will get back to you within <strong>24 hours</strong>.</p>
+      <p style="margin:0 0 14px;">If your request is urgent, feel free to WhatsApp us directly &mdash; we&rsquo;re happy to chat.</p>
+      <p style="margin:22px 0 0;">Talk soon,<br/>The Webkid team</p>`,
+  });
+  return { subject: `Thanks for reaching out, ${opts.name} — we'll be in touch`, html };
+}
+
 export function testEmail(opts: { recipientName: string }): { subject: string; html: string } {
   const html = layout({
     preview: "Webkid CRM email pipeline test",

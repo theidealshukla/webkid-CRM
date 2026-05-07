@@ -6,6 +6,7 @@ import {
   notifyLeadAssigned,
   notifyReminderSet,
   notifyClientConverted,
+  notifyWebsiteLeadCreated,
 } from "@/lib/notifications";
 
 export const runtime = "nodejs";
@@ -63,6 +64,8 @@ export async function POST(req: NextRequest) {
       results.push(await notifyBatchUploaded(record.id));
     } else if (table === "activities" && type === "INSERT" && record && record.reminder_date) {
       results.push(await notifyReminderSet(record.id));
+    } else if (table === "website_leads" && type === "INSERT" && record) {
+      results.push(await notifyWebsiteLeadCreated(record.id));
     }
   } catch (e: unknown) {
     // Always return 200 so Supabase doesn't infinite-retry; log failure.
