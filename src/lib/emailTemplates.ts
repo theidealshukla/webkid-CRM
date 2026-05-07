@@ -271,6 +271,31 @@ export function reminderDueEmail(opts: {
   };
 }
 
+export function clientConvertedEmail(opts: {
+  recipientName: string;
+  leadName: string;
+  services?: string | null;
+  notes?: string | null;
+  convertedBy: string;
+  clientUrl: string;
+}): { subject: string; html: string } {
+  const html = layout({
+    preview: `New client: ${opts.leadName}`,
+    eyebrow: "New Client \u{1F389}",
+    eyebrowColor: "#10b981",
+    heading: `${escape(opts.leadName)} is officially a client.`,
+    body: `<p style="margin:0;">
+      <strong>${escape(opts.convertedBy)}</strong> just converted this lead to a client. Welcome aboard!
+    </p>${opts.notes ? `<blockquote style="margin:20px 0 0;padding:14px 16px;background:#ecfdf5;border-left:3px solid #10b981;border-radius:6px;font-size:14px;color:#065f46;">${escape(opts.notes)}</blockquote>` : ""}`,
+    meta: [
+      { label: "Client", value: opts.leadName },
+      ...(opts.services ? [{ label: "Services", value: opts.services }] : []),
+    ],
+    cta: { label: "View client", href: opts.clientUrl },
+  });
+  return { subject: `\u{1F389} New client: ${opts.leadName}`, html };
+}
+
 export function testEmail(opts: { recipientName: string }): { subject: string; html: string } {
   const html = layout({
     preview: "Webkid CRM email pipeline test",

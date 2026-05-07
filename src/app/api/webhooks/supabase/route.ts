@@ -5,6 +5,7 @@ import {
   notifyStatusChanged,
   notifyLeadAssigned,
   notifyReminderSet,
+  notifyClientConverted,
 } from "@/lib/notifications";
 
 export const runtime = "nodejs";
@@ -51,6 +52,11 @@ export async function POST(req: NextRequest) {
       if (record.assigned_to && record.assigned_to !== old_record.assigned_to) {
         results.push(
           await notifyLeadAssigned(record.id, record.assigned_to, record.uploaded_by ?? null)
+        );
+      }
+      if (record.is_client === true && old_record.is_client !== true) {
+        results.push(
+          await notifyClientConverted(record.id, record.uploaded_by ?? null)
         );
       }
     } else if (table === "upload_batches" && type === "INSERT" && record) {

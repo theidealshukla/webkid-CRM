@@ -36,6 +36,10 @@ export interface Lead {
   manualNotes?: string;
   whatsapp?: string;              // Not in DB, kept for UI (stored in manual_notes or ignored)
   isArchived?: boolean;
+  isClient?: boolean;
+  becameClientAt?: string;
+  clientServices?: string;
+  clientNotes?: string;
 }
 
 // Raw DB row shape for leads
@@ -60,6 +64,10 @@ export interface LeadRow {
   manual_notes: string | null;
   created_at: string;
   updated_at: string;
+  is_client?: boolean;
+  became_client_at?: string | null;
+  client_services?: string | null;
+  client_notes?: string | null;
 }
 
 export interface Activity {
@@ -191,6 +199,10 @@ export function mapLeadRow(row: LeadRow, usersMap: Map<string, string>): Lead {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     lastActivity: "",  // Will be computed separately
+    isClient: row.is_client === true,
+    becameClientAt: row.became_client_at || undefined,
+    clientServices: row.client_services || undefined,
+    clientNotes: row.client_notes || undefined,
   };
 }
 

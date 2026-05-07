@@ -7,7 +7,13 @@
       "Bash(./node_modules/.bin/tsc --noEmit)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git commit *)",
+      "Bash(git restore *)",
+      "Bash(openssl rand *)",
+      "Bash(git check-ignore *)",
+      "Bash(node scripts/send-demo-email.mjs)",
+      "Bash(node scripts/send-demo-reminders.mjs)"
     ]
   }
 }

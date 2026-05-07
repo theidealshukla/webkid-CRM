@@ -24,6 +24,13 @@ interface CRMContextType {
   uploadExcelLeads: (leads: Omit<Lead, "id" | "createdAt" | "lastActivity">[], batch: Omit<UploadBatch, "id">) => void;
   archiveBatch: (batchId: string) => void;
   deleteBatch: (batchId: string) => void;
+  convertToClient: (leadIds: string[], services: string, notes?: string) => Promise<void>;
+  revertToLead: (leadIds: string[]) => Promise<void>;
+  updateClientInfo: (leadId: string, services: string, notes?: string) => Promise<void>;
+  bulkUpdateStatus: (leadIds: string[], status: LeadStatus) => Promise<void>;
+  bulkAssign: (leadIds: string[], assigneeName: string) => Promise<void>;
+  bulkArchive: (leadIds: string[]) => Promise<void>;
+  bulkDelete: (leadIds: string[]) => Promise<void>;
   refreshData: () => Promise<void>;
 }
 
@@ -481,6 +488,140 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     }
   }, [leads, loadData, addLog]);
 
+  // ── Client conversion + bulk actions ────────────────────────────
+  const convertToClient = useCallback(async (leadIds: string[], services: string, notes?: string) => {
+    if (leadIds.length === 0) return;
+    const becameAt = new Date().toISOString();
+    const updates = {
+      is_client: true,
+      became_client_at: becameAt,
+      client_services: services || null,
+      client_notes: notes || null,
+      updated_at: becameAt,
+    };
+    try {
+      setLeads(prev => prev.map(l => leadIds.includes(l.id)
+        ? { ...l, isClient: true, becameClientAt: becameAt, clientServices: services || undefined, clientNotes: notes || undefined }
+        : l));
+      const { error } = await supabase.from("leads").update(updates as Record<string, unknown>).in("id", leadIds);
+      if (error) throw error;
+      addLog(`Converted ${leadIds.length} lead(s) to client`, "lead", leadIds[0], undefined, { count: leadIds.length, services });
+      toast.success(`${leadIds.length} lead${leadIds.length > 1 ? "s" : ""} converted to client${leadIds.length > 1 ? "s" : ""}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to convert";
+      console.error("Convert to client error:", e);
+      toast.error(msg);
+      loadData();
+    }
+  }, [loadData, addLog]);
+
+  const revertToLead = useCallback(async (leadIds: string[]) => {
+    if (leadIds.length === 0) return;
+    try {
+      setLeads(prev => prev.map(l => leadIds.includes(l.id)
+        ? { ...l, isClient: false, becameClientAt: undefined }
+        : l));
+      const { error } = await supabase
+        .from("leads")
+        .update({ is_client: false, became_client_at: null, updated_at: new Date().toISOString() } as Record<string, unknown>)
+        .in("id", leadIds);
+      if (error) throw error;
+      addLog(`Moved ${leadIds.length} client(s) back to leads`, "lead", leadIds[0], undefined, { count: leadIds.length });
+      toast.success(`Moved ${leadIds.length} back to leads`);
+    } catch (e) {
+      console.error("Revert to lead error:", e);
+      toast.error("Failed to move back");
+      loadData();
+    }
+  }, [loadData, addLog]);
+
+  const updateClientInfo = useCallback(async (leadId: string, services: string, notes?: string) => {
+    try {
+      setLeads(prev => prev.map(l => l.id === leadId
+        ? { ...l, clientServices: services || undefined, clientNotes: notes || undefined }
+        : l));
+      const { error } = await supabase
+        .from("leads")
+        .update({ client_services: services || null, client_notes: notes || null, updated_at: new Date().toISOString() } as Record<string, unknown>)
+        .eq("id", leadId);
+      if (error) throw error;
+      toast.success("Client info updated");
+    } catch (e) {
+      console.error("Update client info error:", e);
+      toast.error("Failed to update");
+      loadData();
+    }
+  }, [loadData]);
+
+  const bulkUpdateStatus = useCallback(async (leadIds: string[], status: LeadStatus) => {
+    if (leadIds.length === 0) return;
+    try {
+      setLeads(prev => prev.map(l => leadIds.includes(l.id) ? { ...l, status, lastActivity: "Just now" } : l));
+      const { error } = await supabase
+        .from("leads")
+        .update({ status, updated_at: new Date().toISOString() })
+        .in("id", leadIds);
+      if (error) throw error;
+      addLog(`Bulk status update to ${status}`, "lead", leadIds[0], undefined, { count: leadIds.length, status });
+      toast.success(`Updated ${leadIds.length} lead${leadIds.length > 1 ? "s" : ""}`);
+    } catch (e) {
+      console.error("Bulk status error:", e);
+      toast.error("Failed to update");
+      loadData();
+    }
+  }, [loadData, addLog]);
+
+  const bulkAssign = useCallback(async (leadIds: string[], assigneeName: string) => {
+    if (leadIds.length === 0) return;
+    const assigneeId = nameToIdMap.get(assigneeName) || null;
+    try {
+      setLeads(prev => prev.map(l => leadIds.includes(l.id)
+        ? { ...l, assignedTo: assigneeId, assignedToName: assigneeName }
+        : l));
+      const { error } = await supabase
+        .from("leads")
+        .update({ assigned_to: assigneeId, updated_at: new Date().toISOString() })
+        .in("id", leadIds);
+      if (error) throw error;
+      addLog(`Bulk assign to ${assigneeName}`, "lead", leadIds[0], undefined, { count: leadIds.length, assignee: assigneeName });
+      toast.success(`Assigned ${leadIds.length} to ${assigneeName}`);
+    } catch (e) {
+      console.error("Bulk assign error:", e);
+      toast.error("Failed to assign");
+      loadData();
+    }
+  }, [nameToIdMap, loadData, addLog]);
+
+  const bulkArchive = useCallback(async (leadIds: string[]) => {
+    if (leadIds.length === 0) return;
+    try {
+      setLeads(prev => prev.map(l => leadIds.includes(l.id) ? { ...l, isArchived: true } : l));
+      const { error } = await supabase.from("leads").update({ is_archived: true } as Record<string, unknown>).in("id", leadIds);
+      if (error) throw error;
+      addLog(`Archived ${leadIds.length} lead(s)`, "lead", leadIds[0], undefined, { count: leadIds.length });
+      toast.success(`Archived ${leadIds.length}`);
+    } catch (e) {
+      console.error("Bulk archive error:", e);
+      loadData();
+    }
+  }, [loadData, addLog]);
+
+  const bulkDelete = useCallback(async (leadIds: string[]) => {
+    if (leadIds.length === 0) return;
+    try {
+      setLeads(prev => prev.filter(l => !leadIds.includes(l.id)));
+      await supabase.from("activities").delete().in("lead_id", leadIds);
+      const { error } = await supabase.from("leads").delete().in("id", leadIds);
+      if (error) throw error;
+      addLog(`Deleted ${leadIds.length} lead(s)`, "lead", leadIds[0], undefined, { count: leadIds.length });
+      toast.success(`Deleted ${leadIds.length}`);
+    } catch (e) {
+      console.error("Bulk delete error:", e);
+      toast.error("Failed to delete");
+      loadData();
+    }
+  }, [loadData, addLog]);
+
   return (
     <CRMContext.Provider
       value={{
@@ -500,6 +641,13 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         uploadExcelLeads,
         archiveBatch,
         deleteBatch,
+        convertToClient,
+        revertToLead,
+        updateClientInfo,
+        bulkUpdateStatus,
+        bulkAssign,
+        bulkArchive,
+        bulkDelete,
         refreshData: loadData,
       }}
     >

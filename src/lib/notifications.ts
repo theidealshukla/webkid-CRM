@@ -7,6 +7,7 @@ import {
   leadAssignedEmail,
   reminderSetEmail,
   reminderDueEmail,
+  clientConvertedEmail,
 } from "./emailTemplates";
 
 const APP_URL = process.env.APP_URL || "https://crm.webkid.in";
@@ -260,6 +261,36 @@ export async function notifyReminderSet(activityId: string) {
       dueDate: act.reminder_date as string,
       setBy: setBy?.name || "A teammate",
       leadUrl: `${APP_URL}/crm/leads/${act.lead_id}`,
+    }),
+  });
+}
+
+export async function notifyClientConverted(leadId: string, convertedById: string | null) {
+  const supabase = getServiceClient();
+  const { data: lead } = await supabase
+    .from("leads")
+    .select("id, business_name, client_services, client_notes")
+    .eq("id", leadId)
+    .single();
+  if (!lead) return { sent: 0, skipped: 0, reason: "lead-not-found" };
+
+  const [recipients, convertedBy] = await Promise.all([
+    getAllTeamMembers(),
+    convertedById ? getUserById(convertedById) : Promise.resolve(null),
+  ]);
+
+  return fanOut({
+    kind: "client_converted",
+    entityType: "lead",
+    entityId: leadId,
+    recipients,
+    build: (u) => clientConvertedEmail({
+      recipientName: u.name,
+      leadName: lead.business_name,
+      services: lead.client_services,
+      notes: lead.client_notes,
+      convertedBy: convertedBy?.name || "A teammate",
+      clientUrl: `${APP_URL}/crm/clients`,
     }),
   });
 }

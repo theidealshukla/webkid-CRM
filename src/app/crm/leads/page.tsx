@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Download, RotateCcw, FileSpreadsheet, Clock, Trash2, Users, ArrowRight } from "lucide-react";
+import { Search, Download, RotateCcw, FileSpreadsheet, Clock, Trash2, Users, ArrowRight, Briefcase, X, Archive } from "lucide-react";
 import { useCRM, formatTimeAgo } from "@/context/CRMContext";
 import { useAuth } from "@/context/AuthContext";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -27,14 +27,21 @@ import { LeadRow, MobileLeadCard } from "./components/LeadRow";
 import LeadTableSkeleton from "./components/LeadTableSkeleton";
 import EmptyState from "./components/EmptyState";
 import { nicheColors } from "@/lib/constants";
-import { STATUS_LABELS } from "@/lib/constants";
+import { STATUS_LABELS, ALL_STATUSES, statusConfig } from "@/lib/constants";
 import type { LeadStatus } from "@/types";
+import { ConvertToClientModal } from "@/components/crm/ConvertToClientModal";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
 const ITEMS_PER_PAGE = 50;
 
 export default function LeadsPage() {
-  const { leads, batches, updateLeadStatus, assignLead, archiveLead, deleteLead, deleteBatch, isLoadingData } = useCRM();
+  const {
+    leads, batches,
+    updateLeadStatus, assignLead, archiveLead, deleteLead, deleteBatch,
+    convertToClient, bulkUpdateStatus, bulkAssign, bulkArchive, bulkDelete,
+    isLoadingData,
+  } = useCRM();
   const { teamMembers } = useAuth();
   const teamNames = useMemo(() => teamMembers.map((m) => m.name), [teamMembers]);
 
@@ -45,10 +52,13 @@ export default function LeadsPage() {
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [batchFilter, setBatchFilter] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [convertModal, setConvertModal] = useState<{ open: boolean; ids: string[] }>({ open: false, ids: [] });
 
   const debouncedSearch = useDebounce(searchTerm, 300);
 
-  const activeLeads = useMemo(() => leads.filter((l) => !l.isArchived), [leads]);
+  // Active leads = not archived AND not yet converted to client
+  const activeLeads = useMemo(() => leads.filter((l) => !l.isArchived && !l.isClient), [leads]);
 
   const niches = useMemo(
     () => [...new Set(activeLeads.map((l) => l.niche).filter(Boolean))],
@@ -121,6 +131,50 @@ export default function LeadsPage() {
     },
     [deleteLead]
   );
+
+  const toggleSelect = useCallback((id: string, checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (checked) next.add(id); else next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  const handleSingleConvert = useCallback((id: string) => {
+    setConvertModal({ open: true, ids: [id] });
+  }, []);
+
+  const handleBulkConvert = useCallback(() => {
+    setConvertModal({ open: true, ids: Array.from(selectedIds) });
+  }, [selectedIds]);
+
+  const onConvertConfirm = useCallback(async (services: string, notes: string) => {
+    await convertToClient(convertModal.ids, services, notes);
+    clearSelection();
+  }, [convertToClient, convertModal.ids, clearSelection]);
+
+  const handleBulkAssign = useCallback(async (assigneeName: string) => {
+    await bulkAssign(Array.from(selectedIds), assigneeName);
+    clearSelection();
+  }, [bulkAssign, selectedIds, clearSelection]);
+
+  const handleBulkStatus = useCallback(async (status: LeadStatus) => {
+    await bulkUpdateStatus(Array.from(selectedIds), status);
+    clearSelection();
+  }, [bulkUpdateStatus, selectedIds, clearSelection]);
+
+  const handleBulkArchive = useCallback(async () => {
+    await bulkArchive(Array.from(selectedIds));
+    clearSelection();
+  }, [bulkArchive, selectedIds, clearSelection]);
+
+  const handleBulkDelete = useCallback(async () => {
+    if (!confirm(`Permanently delete ${selectedIds.size} lead(s)? This cannot be undone.`)) return;
+    await bulkDelete(Array.from(selectedIds));
+    clearSelection();
+  }, [bulkDelete, selectedIds, clearSelection]);
 
   const resetFilters = () => {
     setSearchTerm("");

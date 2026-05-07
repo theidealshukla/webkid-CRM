@@ -21,6 +21,7 @@ import {
   Globe,
   MessageCircle,
   Trash2,
+  Briefcase,
 } from "lucide-react";
 import { TableRow, TableCell } from "@/components/ui/table";
 import type { Lead, LeadStatus } from "@/types";
@@ -30,20 +31,26 @@ import { statusConfig, sourceConfig, ALL_STATUSES } from "@/lib/constants";
 interface LeadRowProps {
   lead: Lead;
   index: number;
+  selected?: boolean;
+  onSelectChange?: (id: string, checked: boolean) => void;
   onStatusChange: (leadId: string, status: LeadStatus) => void;
   onAssign: (leadId: string, assignee: string) => void;
   onArchive: (leadId: string) => void;
   onDelete: (leadId: string) => void;
+  onConvertToClient?: (leadId: string) => void;
   teamMembers: string[];
 }
 
 const LeadRow = React.memo(function LeadRow({
   lead,
   index,
+  selected = false,
+  onSelectChange,
   onStatusChange,
   onAssign,
   onArchive,
   onDelete,
+  onConvertToClient,
   teamMembers,
 }: LeadRowProps) {
   const [actionDialog, setActionDialog] = useState<{
@@ -56,9 +63,19 @@ const LeadRow = React.memo(function LeadRow({
 
   return (
     <>
-      <TableRow className="group">
+      <TableRow className={`group ${selected ? "bg-indigo-50/40" : ""}`}>
+        {/* select */}
+        <TableCell className="w-[3%] py-3">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) => onSelectChange?.(lead.id, e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+            aria-label={`Select ${lead.businessName}`}
+          />
+        </TableCell>
         {/* # */}
-        <TableCell className="w-[4%] text-xs text-gray-400 font-mono">{index}</TableCell>
+        <TableCell className="w-[3%] text-xs text-gray-400 font-mono">{index}</TableCell>
 
         {/* Business Name */}
         <TableCell className="w-[23%] py-3">
@@ -207,6 +224,11 @@ const LeadRow = React.memo(function LeadRow({
                   </a>
                 </DropdownMenuItem>
               )}
+              {onConvertToClient && (
+                <DropdownMenuItem onClick={() => onConvertToClient(lead.id)} className="gap-2.5 rounded-lg m-1 cursor-pointer font-semibold text-emerald-600 hover:bg-emerald-50 focus:bg-emerald-50 group">
+                  <Briefcase className="h-4 w-4 text-emerald-500 group-hover:text-emerald-600 transition-colors" /> Convert to Client
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator className="bg-gray-100" />
               <DropdownMenuItem onClick={() => onArchive(lead.id)} className="gap-2.5 rounded-lg m-1 cursor-pointer font-semibold text-amber-600 hover:bg-amber-50 focus:bg-amber-50 group">
                 <Archive className="h-4 w-4 text-amber-500 group-hover:text-amber-600 transition-colors" /> Archive Lead
@@ -235,7 +257,8 @@ const LeadRow = React.memo(function LeadRow({
     prev.lead.assignedTo === next.lead.assignedTo &&
     prev.lead.assignedToName === next.lead.assignedToName &&
     prev.lead.lastActivity === next.lead.lastActivity &&
-    prev.index === next.index
+    prev.index === next.index &&
+    prev.selected === next.selected
   );
 });
 
