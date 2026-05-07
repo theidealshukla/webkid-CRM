@@ -437,7 +437,21 @@ export default function LeadsPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50/80 border-b border-gray-100/80 hover:bg-gray-50/80">
-                  <TableHead className="w-[4%] text-[10px] font-bold uppercase tracking-wider text-gray-400">#</TableHead>
+                  <TableHead className="w-[3%]">
+                    <input
+                      type="checkbox"
+                      checked={paginatedLeads.length > 0 && paginatedLeads.every(l => selectedIds.has(l.id))}
+                      onChange={(e) => {
+                        const next = new Set(selectedIds);
+                        if (e.target.checked) paginatedLeads.forEach(l => next.add(l.id));
+                        else paginatedLeads.forEach(l => next.delete(l.id));
+                        setSelectedIds(next);
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      aria-label="Select all on this page"
+                    />
+                  </TableHead>
+                  <TableHead className="w-[3%] text-[10px] font-bold uppercase tracking-wider text-gray-400">#</TableHead>
                   <TableHead className="w-[23%] text-[10px] font-bold uppercase tracking-wider text-gray-400">Business Name</TableHead>
                   <TableHead className="w-[11%] text-[10px] font-bold uppercase tracking-wider text-gray-400">Phone</TableHead>
                   <TableHead className="w-[9%] text-[10px] font-bold uppercase tracking-wider text-gray-400">Source</TableHead>
@@ -454,10 +468,13 @@ export default function LeadsPage() {
                     key={lead.id}
                     lead={lead}
                     index={(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}
+                    selected={selectedIds.has(lead.id)}
+                    onSelectChange={toggleSelect}
                     onStatusChange={handleStatusChange}
                     onAssign={handleAssign}
                     onArchive={handleArchive}
                     onDelete={handleDelete}
+                    onConvertToClient={handleSingleConvert}
                     teamMembers={teamNames}
                   />
                 ))}
