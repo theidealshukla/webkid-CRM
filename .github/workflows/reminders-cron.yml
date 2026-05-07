@@ -1,0 +1,28 @@
+name: Send due reminders
+
+on:
+  schedule:
+    # Daily at 02:30 UTC (= 08:00 IST). Adjust if your team is in a different zone.
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      REMINDER_URL: ${{ secrets.REMINDER_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Hit reminder endpoint
+        run: |
+          set -e
+          if [ -z "$REMINDER_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Set REMINDER_URL and CRON_SECRET repo secrets."
+            exit 1
+          fi
+          response=$(curl -s -o /tmp/body -w "%{http_code}" \
+            -H "x-cron-secret: $CRON_SECRET" \
+            "$REMINDER_URL")
+          echo "HTTP $response"
+          cat /tmp/body
+          test "$response" = "200"
