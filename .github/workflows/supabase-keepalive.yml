@@ -9,28 +9,29 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
+    env:
+      HEALTH_URL: ${{ secrets.HEALTH_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
       - name: Ping health endpoint
-        if: ${{ secrets.HEALTH_URL != '' }}
+        if: env.HEALTH_URL != ''
         run: |
           set -e
-          response=$(curl -s -o /tmp/body -w "%{http_code}" "${{ secrets.HEALTH_URL }}")
+          response=$(curl -s -o /tmp/body -w "%{http_code}" "$HEALTH_URL")
           echo "HTTP $response"
           cat /tmp/body
           test "$response" = "200"
 
-      - name: Fallback — direct Supabase REST ping
-        if: ${{ secrets.HEALTH_URL == '' }}
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      - name: Fallback - direct Supabase REST ping
+        if: env.HEALTH_URL == ''
         run: |
           set -e
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
             echo "Set HEALTH_URL OR (SUPABASE_URL + SUPABASE_ANON_KEY) repo secrets."
             exit 1
           fi
           curl -fsSL "$SUPABASE_URL/rest/v1/users?select=id&limit=1" \
-            -H "apikey: $SUPABASE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_KEY"
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY"
           echo "OK"
