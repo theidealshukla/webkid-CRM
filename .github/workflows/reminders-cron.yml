@@ -22,10 +22,20 @@ jobs:
             exit 1
           fi
 
-          # Strip CR/LF/whitespace that often sneaks in when secrets are pasted from
-          # Windows clipboards. Without this, curl errors with "Malformed input to a URL function".
-          REMINDER_URL=$(printf '%s' "$REMINDER_URL" | tr -d '\r\n\t ' )
-          CRON_SECRET=$(printf '%s' "$CRON_SECRET" | tr -d '\r\n')
+          # Diagnostic: byte length + hex dump of any non-printable / non-ASCII chars in the URL.
+          # Secrets are masked in logs, but length + count of suspicious bytes are safe to print.
+          raw_len=${#REMINDER_URL}
+          printable_count=$(printf '%s' "$REMINDER_URL" | LC_ALL=C tr -cd 'A-Za-z0-9:/?.&=_%~+#@-' | wc -c)
+          echo "URL raw length: $raw_len"
+          echo "Valid-URL-char count: $printable_count"
+          if [ "$raw_len" != "$printable_count" ]; then
+            echo "::warning::URL contains $((raw_len - printable_count)) non-URL characters (whitespace, quotes, smart-quotes, BOM, etc). Stripping."
+          fi
+
+          # Aggressive scrub: keep ONLY characters legal in a URL. This kills CR/LF, regular and
+          # smart quotes, BOMs, zero-width spaces, etc. — every plausible paste artifact.
+          REMINDER_URL=$(printf '%s' "$REMINDER_URL" | LC_ALL=C tr -cd 'A-Za-z0-9:/?.&=_%~+#@-')
+          CRON_SECRET=$(printf '%s' "$CRON_SECRET" | LC_ALL=C tr -cd 'A-Za-z0-9_/+=.-')
 
           # Mask + sanity-check the URL without leaking secrets to logs.
           url_host=$(printf '%s' "$REMINDER_URL" | sed -E 's#https?://##' | cut -d/ -f1)
