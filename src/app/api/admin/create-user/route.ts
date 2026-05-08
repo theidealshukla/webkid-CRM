@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { notifyUserCreated } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -108,10 +109,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Fire-and-log the welcome email. Don't fail user creation if mail fails.
+    let welcomeStatus: { sent: number; skipped: number; error?: string } | null = null;
+    try {
+      const result = await notifyUserCreated({
+        userId: authData.user.id,
+        name: profileRow.name,
+        email,
+        tempPassword: password,
+        role,
+        invitedById: auth.userId,
+      });
+      welcomeStatus = { sent: result.sent, skipped: result.skipped, error: "error" in result ? (result as { error?: string }).error : undefined };
+    } catch (mailErr) {
+      console.error("Welcome email error:", mailErr);
+      welcomeStatus = { sent: 0, skipped: 1, error: mailErr instanceof Error ? mailErr.message : String(mailErr) };
+    }
+
     return NextResponse.json({
       success: true,
       userId: authData.user.id,
       message: `User "${profileRow.name}" created as ${role}.`,
+      welcome: welcomeStatus,
     });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Internal server error";

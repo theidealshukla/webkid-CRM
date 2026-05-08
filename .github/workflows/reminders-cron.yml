@@ -2,8 +2,9 @@ name: Send due reminders
 
 on:
   schedule:
-    # Daily at 02:30 UTC (= 08:00 IST). Adjust if your team is in a different zone.
-    - cron: "30 2 * * *"
+    # Hourly. Endpoint dedups via notification_log so day-bucket emails (today/tomorrow)
+    # only fire once; the "soon" bucket fires ~2h before each activity's reminder time.
+    - cron: "30 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -17,12 +18,36 @@ jobs:
         run: |
           set -e
           if [ -z "$REMINDER_URL" ] || [ -z "$CRON_SECRET" ]; then
-            echo "Set REMINDER_URL and CRON_SECRET repo secrets."
+            echo "::error::REMINDER_URL or CRON_SECRET secret is missing."
             exit 1
           fi
-          response=$(curl -s -o /tmp/body -w "%{http_code}" \
+
+          # Mask + sanity-check the URL without leaking secrets to logs.
+          url_host=$(printf '%s' "$REMINDER_URL" | sed -E 's#https?://##' | cut -d/ -f1)
+          echo "Target host: $url_host"
+          if ! printf '%s' "$REMINDER_URL" | grep -qE '^https://'; then
+            echo "::error::REMINDER_URL must start with https://. Got something else."
+            exit 1
+          fi
+
+          # DNS / TLS reachability probe with verbose output if it fails.
+          if ! curl -sSf --max-time 10 --head "$REMINDER_URL" >/dev/null 2>/tmp/probe; then
+            echo "::warning::HEAD probe failed — printing verbose connect diagnostics:"
+            curl -v --max-time 15 --head "$REMINDER_URL" 2>&1 | sed -E 's/(x-cron-secret: ).*/\1***REDACTED***/i' || true
+            echo "----"
+            cat /tmp/probe || true
+          fi
+
+          # Real call. --http1.1 + --tlsv1.2 dodges occasional HTTP/2/TLS quirks on runners
+          # that cause curl exit 35. --retry 3 covers transient cold-start 502s on Netlify.
+          response=$(curl -sS \
+            --http1.1 --tlsv1.2 \
+            --connect-timeout 15 --max-time 60 \
+            --retry 3 --retry-delay 5 --retry-connrefused \
+            -o /tmp/body -w "%{http_code}" \
             -H "x-cron-secret: $CRON_SECRET" \
             "$REMINDER_URL")
           echo "HTTP $response"
-          cat /tmp/body
+          cat /tmp/body || true
+          echo
           test "$response" = "200"

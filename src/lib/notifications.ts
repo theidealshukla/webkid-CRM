@@ -10,6 +10,7 @@ import {
   clientConvertedEmail,
   websiteLeadAdminEmail,
   websiteLeadUserEmail,
+  welcomeEmail,
 } from "./emailTemplates";
 
 const APP_URL = process.env.APP_URL || "https://crm.webkid.in";
@@ -360,7 +361,7 @@ export async function notifyWebsiteLeadCreated(leadId: string) {
   };
 }
 
-export async function notifyReminderDue(activityId: string, when: "today" | "tomorrow") {
+export async function notifyReminderDue(activityId: string, when: "today" | "tomorrow" | "soon") {
   const supabase = getServiceClient();
   const { data: act } = await supabase
     .from("activities")
@@ -389,7 +390,10 @@ export async function notifyReminderDue(activityId: string, when: "today" | "tom
     recipients = await getUsersById(Array.from(recipientIds));
   }
 
-  const kind = when === "today" ? "reminder_today" : "reminder_tomorrow";
+  const kind =
+    when === "today" ? "reminder_today" :
+    when === "tomorrow" ? "reminder_tomorrow" :
+    "reminder_soon";
   return fanOut({
     kind,
     entityType: "activity",
@@ -404,4 +408,40 @@ export async function notifyReminderDue(activityId: string, when: "today" | "tom
       leadUrl: `${APP_URL}/crm/leads/${act.lead_id}`,
     }),
   });
+}
+
+export async function notifyUserCreated(opts: {
+  userId: string;
+  name: string;
+  email: string;
+  tempPassword: string;
+  role: string;
+  invitedById: string | null;
+}) {
+  const invitedBy = opts.invitedById ? await getUserById(opts.invitedById) : null;
+
+  if (await alreadySent("user_welcome", opts.userId, opts.email)) {
+    return { sent: 0, skipped: 1, reason: "already-sent" };
+  }
+
+  const { subject, html } = welcomeEmail({
+    recipientName: opts.name,
+    email: opts.email,
+    tempPassword: opts.tempPassword,
+    role: opts.role,
+    loginUrl: `${APP_URL}/login`,
+    invitedBy: invitedBy?.name || null,
+  });
+
+  const result = await sendEmail({ to: opts.email, subject, html });
+  await logSend({
+    kind: "user_welcome",
+    entityType: "user",
+    entityId: opts.userId,
+    recipient: opts.email,
+    userId: opts.userId,
+    messageId: result.id,
+    error: result.error,
+  });
+  return result.error ? { sent: 0, skipped: 1, error: result.error } : { sent: 1, skipped: 0 };
 }

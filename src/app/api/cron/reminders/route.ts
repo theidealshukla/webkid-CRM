@@ -17,15 +17,21 @@ export async function GET(req: NextRequest) {
   if (!url || !key) return NextResponse.json({ error: "Supabase env missing" }, { status: 503 });
   const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  // Time windows in UTC. Day boundaries are UTC for simplicity; cron fires once a day so jitter is fine.
-  const startOfToday = new Date();
+  // Time windows in UTC. Day buckets are UTC; "soon" = next ~2.5h ahead.
+  // Endpoint can be hit hourly — dedup via notification_log keeps emails one-per-kind.
+  const now = new Date();
+  const startOfToday = new Date(now);
   startOfToday.setUTCHours(0, 0, 0, 0);
   const startOfTomorrow = new Date(startOfToday);
   startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
   const startOfDayAfter = new Date(startOfToday);
   startOfDayAfter.setUTCDate(startOfDayAfter.getUTCDate() + 2);
 
-  const [tomorrowRes, todayRes] = await Promise.all([
+  // "Soon" window: anything coming due in the next ~2.5 hours that's still in the future.
+  // Hourly cron + dedup → each activity gets exactly one "soon" email roughly 2h before.
+  const soonWindowEnd = new Date(now.getTime() + 1000 * 60 * 60 * 2.5);
+
+  const [tomorrowRes, todayRes, soonRes] = await Promise.all([
     supabase
       .from("activities")
       .select("id")
@@ -36,9 +42,18 @@ export async function GET(req: NextRequest) {
       .select("id")
       .gte("reminder_date", startOfToday.toISOString())
       .lt("reminder_date", startOfTomorrow.toISOString()),
+    supabase
+      .from("activities")
+      .select("id")
+      .gte("reminder_date", now.toISOString())
+      .lt("reminder_date", soonWindowEnd.toISOString()),
   ]);
 
-  const totals = { tomorrow: { sent: 0, skipped: 0 }, today: { sent: 0, skipped: 0 } };
+  const totals = {
+    tomorrow: { sent: 0, skipped: 0 },
+    today: { sent: 0, skipped: 0 },
+    soon: { sent: 0, skipped: 0 },
+  };
 
   for (const row of (tomorrowRes.data as Array<{ id: string }> | null) || []) {
     const r = await notifyReminderDue(row.id, "tomorrow");
@@ -50,6 +65,11 @@ export async function GET(req: NextRequest) {
     totals.today.sent += r.sent;
     totals.today.skipped += r.skipped;
   }
+  for (const row of (soonRes.data as Array<{ id: string }> | null) || []) {
+    const r = await notifyReminderDue(row.id, "soon");
+    totals.soon.sent += r.sent;
+    totals.soon.skipped += r.skipped;
+  }
 
   return NextResponse.json({
     ok: true,
@@ -58,6 +78,7 @@ export async function GET(req: NextRequest) {
     candidates: {
       tomorrow: tomorrowRes.data?.length || 0,
       today: todayRes.data?.length || 0,
+      soon: soonRes.data?.length || 0,
     },
   });
 }

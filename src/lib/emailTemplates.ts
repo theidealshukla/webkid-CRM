@@ -243,32 +243,84 @@ export function reminderDueEmail(opts: {
   leadName: string;
   note: string;
   dueDate: string;
-  when: "today" | "tomorrow";
+  when: "today" | "tomorrow" | "soon";
   leadUrl: string;
 }): { subject: string; html: string } {
   const due = new Date(opts.dueDate);
-  const fmt = due.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+  const dateFmt = due.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+  const timeFmt = due.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
   const isToday = opts.when === "today";
-  const html = layout({
-    preview: isToday ? `Follow up today: ${opts.leadName}` : `Reminder tomorrow: ${opts.leadName}`,
-    eyebrow: isToday ? "Due Today" : "Due Tomorrow",
-    eyebrowColor: isToday ? "#ef4444" : BRAND.accent,
-    heading: isToday
+  const isSoon = opts.when === "soon";
+
+  const eyebrow = isSoon ? "Due Soon" : isToday ? "Due Today" : "Due Tomorrow";
+  const eyebrowColor = isSoon || isToday ? "#ef4444" : BRAND.accent;
+  const bgColor = isSoon || isToday ? "#fef2f2" : "#fffbeb";
+  const borderColor = isSoon || isToday ? "#ef4444" : BRAND.accent;
+  const textColor = isSoon || isToday ? "#7f1d1d" : "#78350f";
+
+  const heading = isSoon
+    ? `Hi ${escape(firstName(opts.recipientName))}, ${escape(opts.leadName)} is up at ${timeFmt}.`
+    : isToday
       ? `Hi ${escape(firstName(opts.recipientName))}, follow up with ${escape(opts.leadName)} today.`
-      : `Heads up — ${escape(opts.leadName)} is on tomorrow's list.`,
-    body: `<blockquote style="margin:0;padding:14px 16px;background:${isToday ? "#fef2f2" : "#fffbeb"};border-left:3px solid ${isToday ? "#ef4444" : BRAND.accent};border-radius:6px;font-size:14px;color:${isToday ? "#7f1d1d" : "#78350f"};">${escape(opts.note)}</blockquote>`,
+      : `Heads up — ${escape(opts.leadName)} is on tomorrow's list.`;
+
+  const preview = isSoon
+    ? `Follow up at ${timeFmt}: ${opts.leadName}`
+    : isToday
+      ? `Follow up today: ${opts.leadName}`
+      : `Reminder tomorrow: ${opts.leadName}`;
+
+  const subject = isSoon
+    ? `Follow up at ${timeFmt}: ${opts.leadName}`
+    : isToday
+      ? `Follow up today: ${opts.leadName}`
+      : `Reminder tomorrow: ${opts.leadName}`;
+
+  const dueLabel = isSoon ? "Due at" : isToday ? "Due today" : "Due tomorrow";
+  const dueValue = isSoon ? `${timeFmt} · ${dateFmt}` : dateFmt;
+
+  const html = layout({
+    preview,
+    eyebrow,
+    eyebrowColor,
+    heading,
+    body: `<blockquote style="margin:0;padding:14px 16px;background:${bgColor};border-left:3px solid ${borderColor};border-radius:6px;font-size:14px;color:${textColor};">${escape(opts.note)}</blockquote>`,
     meta: [
       { label: "Lead", value: opts.leadName },
-      { label: isToday ? "Due today" : "Due tomorrow", value: fmt },
+      { label: dueLabel, value: dueValue },
     ],
     cta: { label: "Open lead", href: opts.leadUrl },
   });
-  return {
-    subject: isToday
-      ? `Follow up today: ${opts.leadName}`
-      : `Reminder tomorrow: ${opts.leadName}`,
-    html,
-  };
+  return { subject, html };
+}
+
+export function welcomeEmail(opts: {
+  recipientName: string;
+  email: string;
+  tempPassword: string;
+  role: string;
+  loginUrl: string;
+  invitedBy?: string | null;
+}): { subject: string; html: string } {
+  const html = layout({
+    preview: `Welcome to Webkid CRM, ${firstName(opts.recipientName)}`,
+    eyebrow: "Welcome Aboard",
+    eyebrowColor: "#10b981",
+    heading: `Hi ${escape(firstName(opts.recipientName))}, your CRM account is ready.`,
+    body: `<p style="margin:0 0 14px;">
+        ${opts.invitedBy ? `<strong>${escape(opts.invitedBy)}</strong> just added you` : "You've been added"} to the Webkid CRM as a <strong>${escape(opts.role)}</strong>. Use the credentials below to sign in for the first time.
+      </p>
+      <p style="margin:0 0 14px;color:${BRAND.muted};font-size:13px;">
+        Tip: change your password from the account settings after your first login.
+      </p>`,
+    meta: [
+      { label: "Email", value: opts.email },
+      { label: "Temporary password", value: opts.tempPassword },
+      { label: "Role", value: opts.role },
+    ],
+    cta: { label: "Sign in to CRM", href: opts.loginUrl },
+  });
+  return { subject: `Welcome to Webkid CRM, ${firstName(opts.recipientName)}`, html };
 }
 
 export function clientConvertedEmail(opts: {
