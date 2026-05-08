@@ -1,7 +1,8 @@
 // Email templates — minimal, brand-aligned, mail-client-safe HTML.
 // Uses inline styles only; no <style> blocks (Gmail strips them in some contexts).
 
-const APP_URL = process.env.APP_URL || "https://crm.webkid.in";
+const APP_URL = process.env.APP_URL || "https://admin.webkid.me";
+const PUBLIC_SITE_URL = "https://webkid.me";
 const BRAND = {
   primary: "#4f46e5",
   primaryDark: "#4338ca",
@@ -398,7 +399,7 @@ function publicLayout(opts: {
               <hr style="border:0;border-top:1px solid ${BRAND.border};margin:0 0 16px;">
               <p style="margin:0;font-size:12px;line-height:1.6;color:${BRAND.subtle};">
                 Webkid &middot; web design &amp; development<br>
-                <a href="https://www.webkid.me" style="color:${BRAND.primary};text-decoration:none;font-weight:600;">webkid.me</a>
+                <a href="${PUBLIC_SITE_URL}" style="color:${BRAND.primary};text-decoration:none;font-weight:600;">webkid.me</a>
               </p>
             </td>
           </tr>

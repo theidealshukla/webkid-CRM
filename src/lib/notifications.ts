@@ -13,7 +13,7 @@ import {
   welcomeEmail,
 } from "./emailTemplates";
 
-const APP_URL = process.env.APP_URL || "https://crm.webkid.in";
+const APP_URL = process.env.APP_URL || "https://admin.webkid.me";
 
 let cachedClient: SupabaseClient | null = null;
 function getServiceClient(): SupabaseClient {
@@ -429,7 +429,7 @@ export async function notifyUserCreated(opts: {
     email: opts.email,
     tempPassword: opts.tempPassword,
     role: opts.role,
-    loginUrl: `${APP_URL}/login`,
+    loginUrl: `${APP_URL}/crm/login`,
     invitedBy: invitedBy?.name || null,
   });
 
