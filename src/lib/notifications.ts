@@ -424,12 +424,14 @@ export async function notifyUserCreated(opts: {
     return { sent: 0, skipped: 1, reason: "already-sent" };
   }
 
+  // Welcome email always points at the production CRM, regardless of APP_URL —
+  // never want a new user to receive a localhost link from a dev-side run.
   const { subject, html } = welcomeEmail({
     recipientName: opts.name,
     email: opts.email,
     tempPassword: opts.tempPassword,
     role: opts.role,
-    loginUrl: `${APP_URL}/crm/login`,
+    loginUrl: "https://admin.webkid.me/crm/login",
     invitedBy: invitedBy?.name || null,
   });
 
