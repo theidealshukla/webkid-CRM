@@ -22,6 +22,11 @@ jobs:
             exit 1
           fi
 
+          # Strip CR/LF/whitespace that often sneaks in when secrets are pasted from
+          # Windows clipboards. Without this, curl errors with "Malformed input to a URL function".
+          REMINDER_URL=$(printf '%s' "$REMINDER_URL" | tr -d '\r\n\t ' )
+          CRON_SECRET=$(printf '%s' "$CRON_SECRET" | tr -d '\r\n')
+
           # Mask + sanity-check the URL without leaking secrets to logs.
           url_host=$(printf '%s' "$REMINDER_URL" | sed -E 's#https?://##' | cut -d/ -f1)
           echo "Target host: $url_host"
