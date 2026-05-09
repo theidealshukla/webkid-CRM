@@ -16,6 +16,7 @@ import {
   Globe,
   UserPlus,
   Briefcase,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -28,6 +29,7 @@ const navItems = [
   { name: "Manual Leads", path: "/crm/manual-leads", icon: UserPlus },
   { name: "Website Leads", path: "/crm/website-leads", icon: Globe },
   { name: "Follow-ups", path: "/crm/follow-ups", icon: Calendar },
+  { name: "Website CMS", path: "/crm/cms", icon: Sparkles, adminOnly: true },
   { name: "Settings", path: "/crm/settings", icon: Settings, adminOnly: true },
 ];
 
