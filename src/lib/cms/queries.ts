@@ -29,9 +29,18 @@ export async function upsertSetting(key: string, value: unknown): Promise<void> 
 }
 
 // ─── Generic ordered-list helpers ──────────────────────────
-export async function listAll<T>(table: string): Promise<T[]> {
-  const { data, error } = await supabase
-    .from(table).select("*").order("display_order").order("created_at", { ascending: false });
+export async function listAll<T>(
+  table: string,
+  orders: { column: string; ascending?: boolean }[] = [
+    { column: "display_order", ascending: true },
+    { column: "created_at", ascending: false }
+  ]
+): Promise<T[]> {
+  let query = supabase.from(table).select("*");
+  for (const o of orders) {
+    query = query.order(o.column, { ascending: o.ascending ?? true });
+  }
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as T[];
 }
@@ -73,19 +82,19 @@ export const testimonials = {
   remove: (id: string) => deleteRow("cms_testimonials", id),
 };
 export const services = {
-  list: () => listAll<Service>("cms_services"),
+  list: () => listAll<Service>("cms_services", [{ column: "display_order" }]),
   create: (r: Partial<Service>) => insertRow<Service>("cms_services", r),
   update: (id: string, r: Partial<Service>) => updateRow<Service>("cms_services", id, r),
   remove: (id: string) => deleteRow("cms_services", id),
 };
 export const pricing = {
-  list: () => listAll<PricingPlan>("cms_pricing_plans"),
+  list: () => listAll<PricingPlan>("cms_pricing_plans", [{ column: "display_order" }, { column: "updated_at", ascending: false }]),
   create: (r: Partial<PricingPlan>) => insertRow<PricingPlan>("cms_pricing_plans", r),
   update: (id: string, r: Partial<PricingPlan>) => updateRow<PricingPlan>("cms_pricing_plans", id, r),
   remove: (id: string) => deleteRow("cms_pricing_plans", id),
 };
 export const media = {
-  list: () => listAll<MediaAsset>("cms_media_assets"),
+  list: () => listAll<MediaAsset>("cms_media_assets", [{ column: "created_at", ascending: false }]),
   recordUpload: (a: Partial<MediaAsset>) => insertRow<MediaAsset>("cms_media_assets", a),
   remove: (id: string) => deleteRow("cms_media_assets", id),
 };
