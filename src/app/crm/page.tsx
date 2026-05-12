@@ -106,14 +106,14 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-gray-900">
+          <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
             {greeting}, {user?.name?.split(" ")[0] || "there"}
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Here's your high-level overview for today.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Here's your high-level overview for today.</p>
         </div>
-        <Link 
-          href="/crm/leads" 
-           className="hidden sm:flex items-center gap-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm"
+        <Link
+          href="/crm/leads"
+          className="hidden sm:flex items-center gap-2 bg-white dark:bg-[#222224] border border-gray-200 dark:border-[#363638] text-gray-700 dark:text-[#d1d1d3] hover:bg-gray-50 dark:hover:bg-[#2a2a2c] hover:text-gray-900 dark:hover:text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm"
         >
           View Database <ArrowUpRight className="h-4 w-4" />
         </Link>

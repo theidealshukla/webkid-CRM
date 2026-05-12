@@ -50,7 +50,7 @@ export default function FollowUpsPage() {
                       <CalendarCheck className="h-5 w-5 text-amber-500" />
                     </div>
                     <div>
-                      <Link href={`/crm/leads/${fu.leadId}`} className="text-sm font-bold text-gray-900 hover:text-indigo-600 transition-colors">
+                      <Link href={`/crm/leads/${fu.leadId}`} className="text-sm font-bold text-gray-900 hover:text-gray-700 dark:hover:text-white transition-colors">
                         {getLeadName(fu.leadId)}
                       </Link>
                       <p className="text-sm text-gray-600 mt-0.5">{fu.content}</p>
@@ -86,7 +86,7 @@ export default function FollowUpsPage() {
           </h2>
           <div className="space-y-4">
             {past.map((fu) => (
-              <Card key={fu.id} className="border border-red-100 shadow-sm rounded-2xl bg-red-50/20 card-hover">
+              <Card key={fu.id} className="border border-red-100 dark:border-red-900/30 shadow-sm rounded-2xl bg-red-50/20 dark:bg-red-900/10 card-hover">
                 <CardContent className="p-5 flex items-center justify-between">
                   <div className="flex items-center gap-5">
                     <div className="h-12 w-12 rounded-2xl bg-red-50 flex items-center justify-center border border-red-100 shadow-sm">
@@ -94,7 +94,7 @@ export default function FollowUpsPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-3">
-                        <Link href={`/crm/leads/${fu.leadId}`} className="text-sm font-bold text-gray-900 hover:text-indigo-600 transition-colors">
+                        <Link href={`/crm/leads/${fu.leadId}`} className="text-sm font-bold text-gray-900 hover:text-gray-700 dark:hover:text-white transition-colors">
                           {getLeadName(fu.leadId)}
                         </Link>
                         <Badge variant="destructive" className="text-[9px] font-bold uppercase tracking-wider bg-red-100 text-red-700 hover:bg-red-200 border-0">Overdue</Badge>

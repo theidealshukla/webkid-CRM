@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { trustedBusinesses, revalidatePublic } from "@/lib/cms/queries";
 import type { TrustedBusiness } from "@/lib/cms/types";
 import { MediaUploader } from "@/components/cms/MediaUploader";
@@ -11,6 +11,8 @@ import { PublishToggle } from "@/components/cms/PublishToggle";
 export default function TrustedPage() {
   const [rows, setRows] = useState<TrustedBusiness[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dirty, setDirty] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState<Set<string>>(new Set());
 
   async function reload() {
     try { setRows(await trustedBusinesses.list()); }
@@ -28,10 +30,25 @@ export default function TrustedPage() {
     } catch (e: any) { toast.error(e?.message ?? "Add failed"); }
   }
 
-  async function patch(id: string, p: Partial<TrustedBusiness>) {
+  function update(id: string, p: Partial<TrustedBusiness>) {
     setRows((r) => r.map((x) => (x.id === id ? { ...x, ...p } : x)));
-    try { await trustedBusinesses.update(id, p); await revalidatePublic("cms:trusted"); }
-    catch (e: any) { toast.error(e?.message ?? "Update failed"); reload(); }
+    setDirty((d) => new Set(d).add(id));
+  }
+
+  async function save(id: string) {
+    const row = rows.find((x) => x.id === id);
+    if (!row) return;
+    setSaving((s) => new Set(s).add(id));
+    try {
+      await trustedBusinesses.update(id, row);
+      await revalidatePublic("cms:trusted");
+      setDirty((d) => { const n = new Set(d); n.delete(id); return n; });
+      toast.success("Saved — public site will refresh shortly.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Save failed");
+    } finally {
+      setSaving((s) => { const n = new Set(s); n.delete(id); return n; });
+    }
   }
 
   async function remove(id: string) {
@@ -56,22 +73,36 @@ export default function TrustedPage() {
         {rows.map((r) => (
           <div key={r.id} className="border border-gray-200 rounded-lg p-3 space-y-2 bg-white">
             <div className="flex items-start justify-between gap-2">
-              <input value={r.name} onChange={(e) => patch(r.id, { name: e.target.value })} className="input font-semibold"/>
+              <input value={r.name} onChange={(e) => update(r.id, { name: e.target.value })} className="input font-semibold"/>
               <button onClick={() => remove(r.id)} className="p-1 text-gray-400 hover:text-red-600" aria-label="Delete"><Trash2 className="h-4 w-4"/></button>
             </div>
-            <input value={r.city ?? ""} placeholder="City"     onChange={(e) => patch(r.id, { city: e.target.value })} className="input text-sm"/>
-            <input value={r.industry ?? ""} placeholder="Industry" onChange={(e) => patch(r.id, { industry: e.target.value })} className="input text-sm"/>
+            <input value={r.city ?? ""} placeholder="City"     onChange={(e) => update(r.id, { city: e.target.value })} className="input text-sm"/>
+            <input value={r.industry ?? ""} placeholder="Industry" onChange={(e) => update(r.id, { industry: e.target.value })} className="input text-sm"/>
             <MediaUploader resourceType="image" folder="logos"
               value={r.logo_url ? { url: r.logo_url, public_id: r.logo_public_id ?? "" } : null}
-              onChange={(v) => patch(r.id, { logo_url: v?.url ?? null, logo_public_id: v?.public_id ?? null })}/>
+              onChange={(v) => update(r.id, { logo_url: v?.url ?? null, logo_public_id: v?.public_id ?? null })}/>
             <div className="flex items-center justify-between pt-1">
               <label className="flex items-center gap-2 text-xs text-gray-600">
                 <span>Order</span>
-                <input type="number" value={r.display_order} onChange={(e) => patch(r.id, { display_order: Number(e.target.value) })} className="input w-20 text-xs"/>
+                <input type="number" value={r.display_order} onChange={(e) => update(r.id, { display_order: Number(e.target.value) })} className="input w-20 text-xs"/>
               </label>
               <label className="flex items-center gap-2 text-xs text-gray-600">
-                Published <PublishToggle value={r.published} onChange={(v) => patch(r.id, { published: v })}/>
+                Published <PublishToggle value={r.published} onChange={(v) => update(r.id, { published: v })}/>
               </label>
+            </div>
+            <div className="pt-1 border-t border-gray-100">
+              <button
+                onClick={() => save(r.id)}
+                disabled={saving.has(r.id) || !dirty.has(r.id)}
+                className={`w-full inline-flex items-center justify-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-md transition-colors ${
+                  saving.has(r.id) ? "bg-indigo-500 text-white opacity-70 cursor-not-allowed"
+                  : dirty.has(r.id) ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                  : "bg-gray-100 text-gray-400 cursor-default"
+                }`}
+              >
+                {saving.has(r.id) ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4"/>}
+                {saving.has(r.id) ? "Saving…" : dirty.has(r.id) ? "Save & publish" : "All changes saved"}
+              </button>
             </div>
           </div>
         ))}

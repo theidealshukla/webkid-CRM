@@ -187,7 +187,7 @@ export default function ManualLeadsPage() {
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">Manual Leads</h1>
           <p className="text-sm text-gray-500 mt-1">{manualLeads.length} manually added leads</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)} className="gap-2 rounded-xl shadow-sm h-11 px-6 font-bold bg-indigo-600 hover:bg-indigo-700 text-white">
+        <Button onClick={() => setIsModalOpen(true)} className="gap-2 rounded-xl shadow-sm h-11 px-6 font-bold bg-gray-900 dark:bg-[#f5f5f7] hover:bg-black dark:hover:bg-white text-white dark:text-[#0c0c0d]">
           <Plus className="h-5 w-5" /> Add New Manual Lead
         </Button>
       </div>

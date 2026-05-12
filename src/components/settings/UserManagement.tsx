@@ -316,7 +316,7 @@ export default function UserManagement() {
                 setShowAddForm(!showAddForm);
                 setAddStatus(null);
               }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold px-4 h-9 shadow-sm transition-all duration-200 hover:shadow-md"
+              className="bg-gray-900 dark:bg-[#f5f5f7] hover:bg-black dark:hover:bg-white text-white dark:text-[#0c0c0d] rounded-xl text-xs font-semibold px-4 h-9 shadow-sm transition-all duration-200 hover:shadow-md"
             >
               <UserPlus className="h-3.5 w-3.5 mr-1.5" />
               Add User
@@ -448,7 +448,7 @@ export default function UserManagement() {
                   <Button
                     type="submit"
                     disabled={addingUser || !newEmail || !newPassword}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold px-5 h-9 shadow-sm disabled:opacity-50 transition-all duration-200"
+                    className="bg-gray-900 dark:bg-[#f5f5f7] hover:bg-black dark:hover:bg-white text-white dark:text-[#0c0c0d] rounded-xl text-xs font-semibold px-5 h-9 shadow-sm disabled:opacity-50 transition-all duration-200"
                   >
                     {addingUser ? (
                       <>
@@ -734,7 +734,7 @@ export default function UserManagement() {
             <Button
               onClick={handleSaveEdit}
               disabled={savingEdit}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold px-5 h-9 shadow-sm disabled:opacity-50 transition-all duration-200"
+              className="bg-gray-900 dark:bg-[#f5f5f7] hover:bg-black dark:hover:bg-white text-white dark:text-[#0c0c0d] rounded-xl text-xs font-semibold px-5 h-9 shadow-sm disabled:opacity-50 transition-all duration-200"
             >
               {savingEdit ? (
                 <>

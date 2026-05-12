@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ThemeProvider } from "@/context/ThemeContext";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -64,10 +65,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 export default function CRMLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <AuthGate>{children}</AuthGate>
-      </AuthProvider>
-    </ErrorBoundary>
+    <ThemeProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <AuthGate>{children}</AuthGate>
+        </AuthProvider>
+      </ErrorBoundary>
+    </ThemeProvider>
   );
 }

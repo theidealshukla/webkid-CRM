@@ -113,14 +113,14 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen bg-white border-r border-gray-200 transition-all duration-300 flex flex-col",
+        "fixed left-0 top-0 z-40 h-screen bg-white dark:bg-[#161618] border-r border-gray-200 dark:border-[#2c2c2e] transition-all duration-300 flex flex-col",
         "hidden md:flex",
         collapsed ? "w-[68px]" : "w-64",
         mobileOpen && "!flex w-64"
       )}
     >
       {/* Logo + Mobile Close */}
-      <div className="flex items-center justify-between h-16 px-5 border-b border-gray-100 bg-white">
+      <div className="flex items-center justify-between h-16 px-5 border-b border-gray-100 dark:border-[#2c2c2e] bg-white dark:bg-[#161618]">
         <div className="flex items-center w-full min-w-0 justify-center pr-2">
           <div className={`flex items-center justify-center transition-all duration-300 overflow-visible ${(!collapsed || mobileOpen) ? "h-10 w-40" : "h-10 w-full"}`}>
             <img src="/webkid.svg" alt="Webkid Logo" className={`w-full h-full object-contain drop-shadow-sm ${(!collapsed || mobileOpen) ? "scale-[1.8]" : "scale-[2.5]"}`} />
@@ -130,7 +130,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
         {mobileOpen && (
           <button
             onClick={onMobileClose}
-            className="md:hidden p-1.5 rounded-lg text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors"
+            className="md:hidden p-1.5 rounded-lg text-gray-400 hover:bg-gray-50 dark:hover:bg-[#252527] hover:text-gray-600 dark:hover:text-[#d1d1d3] transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -157,10 +157,10 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
                 rel="noopener noreferrer"
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
-                  "text-gray-500 hover:bg-gray-50 hover:text-gray-900 group"
+                  "text-gray-500 dark:text-[#a1a1a3] hover:bg-gray-50 dark:hover:bg-[#252527] hover:text-gray-900 dark:hover:text-white group"
                 )}
               >
-                <Icon className="h-5 w-5 flex-shrink-0 text-gray-400 group-hover:text-gray-600 transition-colors" />
+                <Icon className="h-5 w-5 flex-shrink-0 text-gray-400 dark:text-[#636366] group-hover:text-gray-600 dark:group-hover:text-[#d1d1d3] transition-colors" />
                 {(!collapsed || mobileOpen) && <span>{item.name}</span>}
               </a>
             );
@@ -174,14 +174,14 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group",
                 isActive
-                  ? "bg-indigo-50/80 text-indigo-700 font-semibold"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+                  ? "bg-indigo-50/80 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-semibold"
+                  : "text-gray-500 dark:text-[#a1a1a3] hover:bg-gray-50 dark:hover:bg-[#252527] hover:text-gray-900 dark:hover:text-white"
               )}
             >
               <Icon
                 className={cn(
                   "h-5 w-5 flex-shrink-0 transition-colors duration-200",
-                  isActive ? "text-indigo-600" : "text-gray-400 group-hover:text-gray-600"
+                  isActive ? "text-indigo-600 dark:text-indigo-400" : "text-gray-400 dark:text-[#636366] group-hover:text-gray-600 dark:group-hover:text-[#d1d1d3]"
                 )}
               />
               {(!collapsed || mobileOpen) && <span>{item.name}</span>}
@@ -191,12 +191,12 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
       </nav>
 
       {/* User Profile & Logout */}
-      <div className="border-t border-gray-100 p-3 bg-gray-50/50">
+      <div className="border-t border-gray-100 dark:border-[#2c2c2e] p-3 bg-gray-50/50 dark:bg-[#1e1e20]/60">
         {(!collapsed || mobileOpen) && user && (
           <div className="flex items-center gap-3 px-2 py-2 mb-2 group relative">
-            <div 
+            <div
               onClick={() => fileInputRef.current?.click()}
-              className="h-10 w-10 rounded-full bg-white shadow-sm border border-gray-200 flex items-center justify-center flex-shrink-0 cursor-pointer overflow-hidden relative transition-colors hover:border-indigo-400 group/avatar"
+              className="h-10 w-10 rounded-full bg-white dark:bg-[#2c2c2e] shadow-sm border border-gray-200 dark:border-[#3a3a3c] flex items-center justify-center flex-shrink-0 cursor-pointer overflow-hidden relative transition-colors hover:border-indigo-400 group/avatar"
               title="Click to upload avatar"
             >
               <input 
@@ -209,7 +209,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
               {localAvatar ? (
                 <img src={localAvatar} alt={user.name} className="h-full w-full object-cover" />
               ) : (
-                <span className="text-gray-700 text-xs font-bold">{initials}</span>
+                <span className="text-gray-700 dark:text-[#ebebed] text-xs font-bold">{initials}</span>
               )}
               {/* Hover overlay */}
               <div className="absolute inset-0 bg-black/50 hidden group-hover/avatar:flex items-center justify-center transition-all">
@@ -217,8 +217,8 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
               </div>
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-sm font-semibold text-gray-900 truncate">{user.name}</span>
-              <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider truncate">{user.role}</span>
+              <span className="text-sm font-semibold text-gray-900 dark:text-[#f5f5f7] truncate">{user.name}</span>
+              <span className="text-[11px] font-medium text-gray-400 dark:text-[#636366] uppercase tracking-wider truncate">{user.role}</span>
             </div>
           </div>
         )}
@@ -226,20 +226,20 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
           onClick={handleLogout}
           className={cn(
             "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 w-full group",
-            "text-gray-500 hover:bg-white hover:text-red-600 hover:shadow-sm hover:border-gray-200 border border-transparent"
+            "text-gray-500 dark:text-[#a1a1a3] hover:bg-white dark:hover:bg-[#252527] hover:text-red-600 dark:hover:text-red-400 hover:shadow-sm hover:border-gray-200 dark:hover:border-[#363638] border border-transparent"
           )}
           title="Log out"
         >
-          <LogOut className="h-5 w-5 flex-shrink-0 text-gray-400 group-hover:text-red-500 transition-colors" />
+          <LogOut className="h-5 w-5 flex-shrink-0 text-gray-400 dark:text-[#636366] group-hover:text-red-500 dark:group-hover:text-red-400 transition-colors" />
           {(!collapsed || mobileOpen) && <span>Log Out</span>}
         </button>
       </div>
 
       {/* Collapse Button (desktop only) */}
-      <div className="p-2 border-t border-gray-100 hidden md:block bg-white">
+      <div className="p-2 border-t border-gray-100 dark:border-[#2c2c2e] hidden md:block bg-white dark:bg-[#161618]">
         <button
           onClick={onToggle}
-          className="flex items-center justify-center w-full h-8 rounded-lg text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors"
+          className="flex items-center justify-center w-full h-8 rounded-lg text-gray-400 dark:text-[#636366] hover:bg-gray-50 dark:hover:bg-[#252527] hover:text-gray-600 dark:hover:text-[#d1d1d3] transition-colors"
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}

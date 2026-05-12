@@ -84,7 +84,7 @@ export default function WebsiteLeadsPage() {
     <div className="space-y-6 animate-fade-in max-w-[1200px] mx-auto">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
-          <Globe className="h-6 w-6 text-indigo-600" />
+          <Globe className="h-6 w-6 text-gray-500 dark:text-[#a1a1a3]" />
           Website Leads
         </h1>
         <p className="text-sm text-gray-500 mt-1">Leads collected directly from your website contact form.</p>
@@ -101,7 +101,7 @@ export default function WebsiteLeadsPage() {
           />
         </div>
         <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
-          Total Leads: <Badge variant="secondary" className="bg-indigo-50 text-indigo-700">{leads.length}</Badge>
+          Total Leads: <Badge variant="secondary" className="bg-gray-100 dark:bg-[#252527] text-gray-700 dark:text-[#d1d1d3]">{leads.length}</Badge>
         </div>
       </div>
 
@@ -129,17 +129,17 @@ export default function WebsiteLeadsPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredLeads.map((lead) => (
-                    <TableRow key={lead.id} className={`group ${!lead.is_read ? 'bg-indigo-50/20' : ''}`}>
+                    <TableRow key={lead.id} className={`group ${!lead.is_read ? 'bg-gray-50/40 dark:bg-[#1e1e20]' : ''}`}>
                       <TableCell className="align-top pt-4">
-                        <button 
+                        <button
                           onClick={() => toggleReadStatus(lead)}
-                          className="text-gray-400 hover:text-indigo-600 transition-colors"
+                          className="text-gray-400 hover:text-gray-200 dark:hover:text-[#f5f5f7] transition-colors"
                           title={lead.is_read ? "Mark as unread" : "Mark as read"}
                         >
                           {lead.is_read ? (
-                            <CheckCircle2 className="h-5 w-5 text-gray-300" />
+                            <CheckCircle2 className="h-5 w-5 text-gray-300 dark:text-[#3a3a3c]" />
                           ) : (
-                            <Circle className="h-5 w-5 fill-indigo-100 text-indigo-600" />
+                            <Circle className="h-5 w-5 fill-gray-300 dark:fill-[#363638] text-gray-500 dark:text-[#636366]" />
                           )}
                         </button>
                       </TableCell>

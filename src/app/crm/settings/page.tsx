@@ -40,11 +40,11 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="pt-6">
           <div className="flex items-center gap-5">
-            <div className="h-16 w-16 rounded-full shadow-sm border border-indigo-100 flex items-center justify-center overflow-hidden bg-indigo-50 shrink-0 relative">
+            <div className="h-16 w-16 rounded-full shadow-sm border border-gray-200 dark:border-[#2c2c2e] flex items-center justify-center overflow-hidden bg-gray-100 dark:bg-[#252527] shrink-0 relative">
               {localAvatar ? (
                 <img src={localAvatar} alt={user?.name} className="h-full w-full object-cover" />
               ) : (
-                <span className="text-indigo-700 text-xl font-bold">
+                <span className="text-gray-700 dark:text-[#f5f5f7] text-xl font-bold">
                   {user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase() || "U"}
                 </span>
               )}
@@ -52,7 +52,7 @@ export default function SettingsPage() {
             <div>
               <p className="text-lg font-bold text-gray-900">{user?.name}</p>
               <p className="text-sm font-medium text-gray-500">{user?.email}</p>
-              <Badge variant="secondary" className="mt-2 capitalize font-semibold tracking-wide text-[10px] bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-0">{user?.role}</Badge>
+              <Badge variant="secondary" className="mt-2 capitalize font-semibold tracking-wide text-[10px] bg-gray-100 dark:bg-[#2c2c2e] text-gray-600 dark:text-[#d1d1d3] hover:bg-gray-200 dark:hover:bg-[#363638] border-0">{user?.role}</Badge>
             </div>
           </div>
         </CardContent>
@@ -78,7 +78,7 @@ export default function SettingsPage() {
                     <p className="text-xs font-medium text-gray-500">{member.email}</p>
                   </div>
                 </div>
-                <Badge variant="outline" className="capitalize text-[10px] font-bold tracking-wider text-gray-500 border-gray-200 bg-white">{member.role}</Badge>
+                <Badge variant="outline" className="capitalize text-[10px] font-bold tracking-wider text-gray-500 dark:text-[#a1a1a3] border-gray-200 dark:border-[#2c2c2e] bg-transparent">{member.role}</Badge>
               </div>
             ))}
           </div>

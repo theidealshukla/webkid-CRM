@@ -255,25 +255,25 @@ export default function LeadsPage() {
       {!batchFilter && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-6">
           {/* All Leads Card */}
-          <Card 
-            className="group cursor-pointer hover:border-indigo-500 hover:shadow-md transition-all border-dashed border-2 border-indigo-200 bg-indigo-50/20" 
+          <Card
+            className="group cursor-pointer hover:border-gray-400 dark:hover:border-[#3a3a3c] hover:shadow-md transition-all border-dashed border-2 border-gray-200 dark:border-[#2c2c2e] bg-gray-50/30 dark:bg-[#1e1e20]"
             onClick={() => { setBatchFilter("all_leads"); setCurrentPage(1); }}
           >
             <CardContent className="p-5 flex flex-col h-full justify-between">
               <div className="flex items-start justify-between mb-4">
-                <div className="h-10 w-10 rounded-xl bg-indigo-100 shadow-sm flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform">
+                <div className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-[#2c2c2e] shadow-sm flex items-center justify-center text-gray-600 dark:text-[#a1a1a3] group-hover:scale-110 transition-transform">
                   <Users className="h-5 w-5" />
                 </div>
               </div>
-              
+
               <div>
-                <h3 className="text-base font-bold text-indigo-900 mb-1">All Leads Database</h3>
-                <p className="text-xs text-indigo-600/70 line-clamp-2 leading-relaxed">View, search, and manage all leads across every batch, including manual uploads.</p>
+                <h3 className="text-base font-bold text-gray-900 dark:text-[#f0f0f2] mb-1">All Leads Database</h3>
+                <p className="text-xs text-gray-500 dark:text-[#707072] line-clamp-2 leading-relaxed">View, search, and manage all leads across every batch, including manual uploads.</p>
               </div>
 
-              <div className="mt-5 pt-4 border-t border-indigo-100/50 flex items-center justify-between">
-                <Badge className="bg-white text-indigo-700 hover:bg-white border-indigo-200 shadow-sm font-semibold">{activeLeads.length} Total</Badge>
-                <div className="flex items-center text-xs font-bold text-indigo-600 group-hover:translate-x-1 transition-transform">
+              <div className="mt-5 pt-4 border-t border-gray-100 dark:border-[#2c2c2e] flex items-center justify-between">
+                <Badge className="bg-white dark:bg-[#2c2c2e] text-gray-700 dark:text-[#d1d1d3] hover:bg-gray-50 dark:hover:bg-[#363638] border-gray-200 dark:border-[#3a3a3c] shadow-sm font-semibold">{activeLeads.length} Total</Badge>
+                <div className="flex items-center text-xs font-bold text-gray-500 dark:text-[#a1a1a3] group-hover:translate-x-1 transition-transform">
                   View Full List <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                 </div>
               </div>

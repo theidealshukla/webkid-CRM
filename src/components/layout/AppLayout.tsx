@@ -21,7 +21,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   return (
-    <div className="min-h-screen bg-gray-50/30">
+    <div className="min-h-screen bg-gray-50/30 dark:bg-[#0c0c0d]">
       {/* Mobile overlay backdrop */}
       {sidebarOpen && (
         <div

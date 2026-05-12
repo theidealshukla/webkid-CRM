@@ -1,10 +1,15 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode: add .dark to <html> to activate */
+@custom-variant dark (&:is(.dark, .dark *));
+
 :root {
   --background: #fafbfc;
   --foreground: #0a0a0a;
   --card: #ffffff;
   --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
   --primary: #171717;
   --primary-foreground: #fafafa;
   --secondary: #f5f5f5;
@@ -25,6 +30,33 @@
   --chart-3: #2563ef;
   --chart-4: #1a4eda;
   --chart-5: #1f3fad;
+}
+
+.dark {
+  --background: #0c0c0d;
+  --foreground: #f5f5f7;
+  --card: #161618;
+  --card-foreground: #f5f5f7;
+  --popover: #1e1e20;
+  --popover-foreground: #f5f5f7;
+  --primary: #f5f5f7;
+  --primary-foreground: #0c0c0d;
+  --secondary: #252527;
+  --secondary-foreground: #f5f5f7;
+  --muted: #1e1e20;
+  --muted-foreground: #a1a1a3;
+  --accent: #252527;
+  --accent-foreground: #f5f5f7;
+  --destructive: #ff453a;
+  --destructive-foreground: #fafafa;
+  --border: #2c2c2e;
+  --input: #1e1e20;
+  --ring: #6366f1;
+  --chart-1: #60a5fa;
+  --chart-2: #818cf8;
+  --chart-3: #a78bfa;
+  --chart-4: #c084fc;
+  --chart-5: #e879f9;
 }
 
 * {
@@ -56,6 +88,14 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #a3a3a3;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #3a3a3c;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #4a4a4c;
 }
 
 /* ─── Animations ─── */
@@ -117,8 +157,160 @@ tr.group:hover td {
   background-color: #fafbfc;
 }
 
+.dark tr.group:hover td {
+  background-color: #1e1e20;
+}
+
+/* ─── Dark mode content area overrides ─── */
+/* Dividers inside cards */
+.dark .divide-gray-50 > * + * {
+  border-color: #2c2c2e;
+}
+/* Card inner separators */
+.dark .border-gray-50 {
+  border-color: #2c2c2e;
+}
+/* Progress / bar backgrounds */
+.dark .bg-gray-100 {
+  background-color: #252527;
+}
+.dark .bg-gray-50 {
+  background-color: #1e1e20;
+}
+/* Inline white/transparent panel backgrounds inside cards */
+.dark [class*="bg-white\/"] {
+  background-color: transparent;
+}
+.dark .bg-white {
+  background-color: #161618;
+}
+/* Text overrides for content inside cards */
+.dark .text-gray-900 {
+  color: #f5f5f7;
+}
+.dark .text-gray-800 {
+  color: #e0e0e2;
+}
+.dark .text-gray-700 {
+  color: #c0c0c2;
+}
+.dark .text-gray-600 {
+  color: #a1a1a3;
+}
+.dark .text-gray-500 {
+  color: #707072;
+}
+/* Hover row states */
+.dark .hover\:bg-gray-50\/50:hover,
+.dark .hover\:bg-gray-50\/30:hover,
+.dark .hover\:bg-gray-50:hover {
+  background-color: #1e1e20;
+}
+/* Input/form elements */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: #1e1e20;
+  color: #f5f5f7;
+  border-color: #2c2c2e;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #636366;
+}
+/* Badges */
+.dark .bg-gray-100.text-gray-700 {
+  background-color: #252527;
+  color: #c0c0c2;
+}
+/* Border overrides */
+.dark .border-gray-100,
+.dark .border-gray-200 {
+  border-color: #2c2c2e;
+}
+
+/* ─── Dark mode: opacity-variant gray backgrounds ─── */
+.dark .bg-gray-50\/80,
+.dark .bg-gray-50\/50,
+.dark .bg-gray-50\/30,
+.dark .bg-gray-50\/20 {
+  background-color: #1a1a1c;
+}
+.dark .hover\:bg-gray-50\/80:hover {
+  background-color: #1a1a1c;
+}
+.dark .bg-white\/50,
+.dark .bg-white\/60,
+.dark .bg-white\/70 {
+  background-color: transparent;
+}
+
+/* ─── Dark mode: pastel backgrounds → charcoal surfaces ─── */
+.dark .bg-indigo-50,
+.dark .bg-indigo-50\/20,
+.dark .bg-indigo-50\/30,
+.dark .bg-indigo-100 {
+  background-color: #1e1e20;
+}
+.dark .bg-blue-50,
+.dark .bg-blue-100,
+.dark .bg-green-50,
+.dark .bg-yellow-50,
+.dark .bg-orange-50,
+.dark .bg-amber-50,
+.dark .bg-purple-50,
+.dark .bg-red-50,
+.dark .bg-red-50\/20 {
+  background-color: #1e1e20;
+}
+
+/* ─── Dark mode: pastel borders → charcoal ─── */
+.dark .border-indigo-50,
+.dark .border-indigo-100,
+.dark .border-blue-100,
+.dark .border-green-100,
+.dark .border-yellow-100,
+.dark .border-amber-100,
+.dark .border-red-100,
+.dark .border-orange-100 {
+  border-color: #2c2c2e;
+}
+
+/* ─── Dark mode: indigo buttons → near-white (matches Add Lead pattern) ─── */
+.dark .bg-indigo-600 {
+  background-color: #f5f5f7;
+  color: #0c0c0d;
+}
+.dark .hover\:bg-indigo-700:hover {
+  background-color: #ffffff;
+  color: #0c0c0d;
+}
+
+/* ─── Dark mode: indigo/blue text → neutral ─── */
+.dark .text-indigo-600 { color: #c8c8ca; }
+.dark .text-indigo-700 { color: #d1d1d3; }
+.dark .text-indigo-900 { color: #f0f0f2; }
+.dark .hover\:text-indigo-600:hover { color: #f5f5f7; }
+.dark .hover\:text-indigo-700:hover { color: #f5f5f7; }
+
+/* ─── Dark mode: remaining blue-tinted Tailwind dark: class overrides ─── */
+.dark .dark\:bg-gray-950 { background-color: #0c0c0d; }
+.dark .dark\:bg-gray-900 { background-color: #161618; }
+.dark .dark\:bg-gray-800 { background-color: #222224; }
+.dark .dark\:bg-gray-700 { background-color: #2a2a2c; }
+.dark .dark\:border-gray-800 { border-color: #2c2c2e; }
+.dark .dark\:border-gray-700 { border-color: #363638; }
+.dark .dark\:text-gray-100 { color: #f5f5f7; }
+.dark .dark\:text-gray-200 { color: #ebebed; }
+.dark .dark\:text-gray-300 { color: #d1d1d3; }
+.dark .dark\:text-gray-400 { color: #a1a1a3; }
+.dark .dark\:text-gray-500 { color: #707072; }
+.dark .dark\:hover\:bg-gray-700:hover { background-color: #2a2a2c; }
+.dark .dark\:hover\:bg-gray-800:hover { background-color: #252527; }
+.dark .dark\:hover\:text-white:hover { color: #f5f5f7; }
+
 /* ─── Selection ─── */
 ::selection {
-  background-color: rgba(99, 102, 241, 0.15);
+  background-color: rgba(200, 200, 202, 0.15);
   color: inherit;
 }

@@ -22,6 +22,8 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link href="https://fonts.cdnfonts.com/css/clash-display" rel="stylesheet" />
+        {/* Prevent flash of wrong theme on load */}
+        <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem('webkid-theme')==='dark'){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark'}}catch(e){}` }} />
       </head>
       <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning>
         {children}
