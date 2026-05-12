@@ -219,6 +219,21 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         setLeads(prev => [newAppLead, ...prev]);
         addLog("Created Lead", "lead", data.id, newAppLead.businessName);
 
+        // Fire-and-forget: notify all team members about the new manual lead.
+        supabase.auth.getSession().then(({ data: sessionData }) => {
+          const token = sessionData?.session?.access_token;
+          if (token) {
+            fetch('/api/notify/lead-created', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({ id: data.id }),
+            }).catch((err: Error) => console.error('Lead notify error:', err.message));
+          }
+        });
+
         // If manual notes exist, also create an actual Activity so it shows in timeline
         if (lead.manualNotes?.trim()) {
           const { data: actData } = await supabase.from("activities").insert([{
