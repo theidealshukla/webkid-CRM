@@ -19,9 +19,10 @@ import { toast } from "sonner";
 interface ManualLeadModalProps {
   open: boolean;
   onClose: () => void;
+  batchId?: string;
 }
 
-export function ManualLeadModal({ open, onClose }: ManualLeadModalProps) {
+export function ManualLeadModal({ open, onClose, batchId }: ManualLeadModalProps) {
   const { addLead } = useCRM();
   const { user } = useAuth();
   const [form, setForm] = useState({
@@ -50,6 +51,7 @@ export function ManualLeadModal({ open, onClose }: ManualLeadModalProps) {
       assignedTo: null,
       source: "manual",
       uploadedBy: user?.id,
+      batchId: batchId || undefined,
     });
 
     toast.success(`Lead "${form.businessName}" added successfully`);

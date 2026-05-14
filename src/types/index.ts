@@ -1,3 +1,35 @@
+export type PaymentType = "upfront" | "final";
+export type PaymentStatus = "pending" | "paid";
+export type PaymentMethod = "upi" | "bank" | "cash" | "other";
+
+export interface Payment {
+  id: string;
+  leadId: string;
+  type: PaymentType;
+  amount: number;
+  status: PaymentStatus;
+  dueDate?: string;
+  paidDate?: string;
+  paymentMethod?: PaymentMethod;
+  reference?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface PaymentRow {
+  id: string;
+  lead_id: string;
+  type: string;
+  amount: number;
+  status: string;
+  due_date: string | null;
+  paid_date: string | null;
+  payment_method: string | null;
+  reference: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
 export type LeadStatus =
   | "new"
   | "contacted"
@@ -40,6 +72,10 @@ export interface Lead {
   becameClientAt?: string;
   clientServices?: string;
   clientNotes?: string;
+  projectStatus?: string;
+  projectValue?: number;
+  projectStartedAt?: string;
+  projectDeliveredAt?: string;
 }
 
 // Raw DB row shape for leads
@@ -68,6 +104,10 @@ export interface LeadRow {
   became_client_at?: string | null;
   client_services?: string | null;
   client_notes?: string | null;
+  project_status?: string | null;
+  project_value?: number | null;
+  project_started_at?: string | null;
+  project_delivered_at?: string | null;
 }
 
 export interface Activity {
@@ -203,6 +243,26 @@ export function mapLeadRow(row: LeadRow, usersMap: Map<string, string>): Lead {
     becameClientAt: row.became_client_at || undefined,
     clientServices: row.client_services || undefined,
     clientNotes: row.client_notes || undefined,
+    projectStatus: row.project_status || "in_progress",
+    projectValue: row.project_value ?? undefined,
+    projectStartedAt: row.project_started_at || undefined,
+    projectDeliveredAt: row.project_delivered_at || undefined,
+  };
+}
+
+export function mapPaymentRow(row: PaymentRow): Payment {
+  return {
+    id: row.id,
+    leadId: row.lead_id,
+    type: row.type as PaymentType,
+    amount: row.amount,
+    status: row.status as PaymentStatus,
+    dueDate: row.due_date ?? undefined,
+    paidDate: row.paid_date ?? undefined,
+    paymentMethod: (row.payment_method as PaymentMethod) ?? undefined,
+    reference: row.reference ?? undefined,
+    notes: row.notes ?? undefined,
+    createdAt: row.created_at,
   };
 }
 

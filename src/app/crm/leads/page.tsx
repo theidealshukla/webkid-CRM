@@ -150,8 +150,8 @@ export default function LeadsPage() {
     setConvertModal({ open: true, ids: Array.from(selectedIds) });
   }, [selectedIds]);
 
-  const onConvertConfirm = useCallback(async (services: string, notes: string) => {
-    await convertToClient(convertModal.ids, services, notes);
+  const onConvertConfirm = useCallback(async (services: string, notes: string, projectValue?: number) => {
+    await convertToClient(convertModal.ids, services, notes, projectValue);
     clearSelection();
   }, [convertToClient, convertModal.ids, clearSelection]);
 

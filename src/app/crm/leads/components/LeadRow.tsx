@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -22,6 +23,7 @@ import {
   MessageCircle,
   Trash2,
   Briefcase,
+  FolderOpen,
 } from "lucide-react";
 import { TableRow, TableCell } from "@/components/ui/table";
 import type { Lead, LeadStatus } from "@/types";
@@ -38,6 +40,7 @@ interface LeadRowProps {
   onArchive: (leadId: string) => void;
   onDelete: (leadId: string) => void;
   onConvertToClient?: (leadId: string) => void;
+  onMove?: (leadId: string) => void;
   teamMembers: string[];
 }
 
@@ -51,8 +54,10 @@ const LeadRow = React.memo(function LeadRow({
   onArchive,
   onDelete,
   onConvertToClient,
+  onMove,
   teamMembers,
 }: LeadRowProps) {
+  const { user } = useAuth();
   const [actionDialog, setActionDialog] = useState<{
     open: boolean;
     tab: "note" | "call" | "follow-up";
@@ -60,6 +65,9 @@ const LeadRow = React.memo(function LeadRow({
 
   const statusStyle = statusConfig[lead.status] || statusConfig.new;
   const srcStyle = sourceConfig[lead.source] || sourceConfig.manual;
+
+  const assigneeDisplay = lead.assignedToName || (user?.name ?? "—");
+  const assigneeInitial = (lead.assignedToName || user?.name || "?")[0]?.toUpperCase();
 
   return (
     <>
@@ -168,21 +176,21 @@ const LeadRow = React.memo(function LeadRow({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2.5 focus:outline-none group/assign hover:bg-gray-50 p-1.5 -ml-1.5 rounded-lg transition-colors">
-                <div className="h-6 w-6 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold">
-                  {(lead.assignedToName || lead.assignedTo)?.[0]?.toUpperCase() || "?"}
+                <div className="h-6 w-6 rounded-full bg-gray-100 dark:bg-[#252527] border border-gray-200 dark:border-[#3a3a3c] text-gray-600 dark:text-[#c0c0c2] flex items-center justify-center text-[10px] font-bold">
+                  {assigneeInitial}
                 </div>
-                <span className="text-sm font-medium text-gray-700 group-hover/assign:text-indigo-600 transition-colors">
-                  {lead.assignedToName || lead.assignedTo || "Unassigned"}
+                <span className="text-sm font-medium text-gray-700 dark:text-[#c0c0c2] group-hover/assign:text-gray-900 dark:group-hover/assign:text-white transition-colors">
+                  {assigneeDisplay}
                 </span>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-44 rounded-xl shadow-lg border-gray-100">
+            <DropdownMenuContent align="start" className="w-44 rounded-xl shadow-lg border-gray-100 dark:border-[#2c2c2e]">
               {teamMembers.map((name) => (
                 <DropdownMenuItem key={name} onClick={() => onAssign(lead.id, name)} className="rounded-lg m-1 cursor-pointer">
-                  <div className="h-5 w-5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold mr-2">
+                  <div className="h-5 w-5 rounded-full bg-gray-100 dark:bg-[#252527] border border-gray-200 dark:border-[#3a3a3c] text-gray-600 dark:text-[#c0c0c2] flex items-center justify-center text-[10px] font-bold mr-2">
                     {name[0]?.toUpperCase()}
                   </div>
-                  <span className="font-medium text-gray-700">{name}</span>
+                  <span className="font-medium text-gray-700 dark:text-[#c0c0c2]">{name}</span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -217,6 +225,11 @@ const LeadRow = React.memo(function LeadRow({
               <DropdownMenuItem onClick={() => setActionDialog({ open: true, tab: "follow-up" })} className="gap-2.5 rounded-lg m-1 cursor-pointer font-medium text-gray-700">
                 <CalendarPlus className="h-4 w-4 text-gray-400" /> Set Follow-up
               </DropdownMenuItem>
+              {onMove && (
+                <DropdownMenuItem onClick={() => onMove(lead.id)} className="gap-2.5 rounded-lg m-1 cursor-pointer font-medium text-gray-700">
+                  <FolderOpen className="h-4 w-4 text-gray-400" /> Move to Folder
+                </DropdownMenuItem>
+              )}
               {lead.mapsLink && (
                 <DropdownMenuItem asChild className="gap-2.5 rounded-lg m-1 cursor-pointer font-medium text-gray-700">
                   <a href={lead.mapsLink} target="_blank" rel="noopener noreferrer">
@@ -270,8 +283,10 @@ const MobileLeadCard = React.memo(function MobileLeadCard({
   onArchive,
   onDelete,
   onConvertToClient,
+  onMove,
   teamMembers,
 }: Omit<LeadRowProps, "index">) {
+  const { user } = useAuth();
   const [actionDialog, setActionDialog] = useState<{
     open: boolean;
     tab: "note" | "call" | "follow-up";
@@ -279,6 +294,9 @@ const MobileLeadCard = React.memo(function MobileLeadCard({
 
   const statusStyle = statusConfig[lead.status] || statusConfig.new;
   const srcStyle = sourceConfig[lead.source] || sourceConfig.manual;
+
+  const assigneeDisplay = lead.assignedToName || (user?.name ?? "—");
+  const assigneeInitial = (lead.assignedToName || user?.name || "?")[0]?.toUpperCase();
 
   return (
     <>
@@ -326,10 +344,10 @@ const MobileLeadCard = React.memo(function MobileLeadCard({
 
         <div className="flex items-center justify-between pt-2 border-t">
           <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-semibold">
-              {(lead.assignedToName || lead.assignedTo)?.[0]?.toUpperCase() || "?"}
+            <div className="h-6 w-6 rounded-full bg-gray-100 dark:bg-[#252527] border border-gray-200 dark:border-[#3a3a3c] text-gray-600 dark:text-[#c0c0c2] flex items-center justify-center text-[10px] font-semibold">
+              {assigneeInitial}
             </div>
-            <span className="text-xs text-gray-500">{lead.assignedToName || lead.assignedTo || "Unassigned"}</span>
+            <span className="text-xs text-gray-500 dark:text-[#a1a1a3]">{assigneeDisplay}</span>
           </div>
 
           {/* Actions dropdown — U1 FIX */}
@@ -354,6 +372,11 @@ const MobileLeadCard = React.memo(function MobileLeadCard({
               <DropdownMenuItem onClick={() => setActionDialog({ open: true, tab: "follow-up" })} className="gap-2">
                 <CalendarPlus className="h-4 w-4" /> Set Follow-up
               </DropdownMenuItem>
+              {onMove && (
+                <DropdownMenuItem onClick={() => onMove(lead.id)} className="gap-2 font-medium text-gray-700">
+                  <FolderOpen className="h-4 w-4" /> Move to Folder
+                </DropdownMenuItem>
+              )}
               {onConvertToClient && (
                 <DropdownMenuItem onClick={() => onConvertToClient(lead.id)} className="gap-2 text-emerald-600">
                   <Briefcase className="h-4 w-4" /> Convert to Client

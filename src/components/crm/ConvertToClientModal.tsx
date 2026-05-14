@@ -12,13 +12,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Briefcase, Loader2 } from "lucide-react";
+import { Briefcase, IndianRupee, Loader2 } from "lucide-react";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   count: number;
-  onConfirm: (services: string, notes: string) => Promise<void> | void;
+  onConfirm: (services: string, notes: string, projectValue?: number) => Promise<void> | void;
   initialServices?: string;
   initialNotes?: string;
   mode?: "convert" | "edit";
@@ -29,19 +29,22 @@ export function ConvertToClientModal({
 }: Props) {
   const [services, setServices] = useState(initialServices);
   const [notes, setNotes] = useState(initialNotes);
+  const [projectValueStr, setProjectValueStr] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   React.useEffect(() => {
     if (open) {
       setServices(initialServices);
       setNotes(initialNotes);
+      setProjectValueStr("");
     }
   }, [open, initialServices, initialNotes]);
 
   const submit = async () => {
     setSubmitting(true);
     try {
-      await onConfirm(services.trim(), notes.trim());
+      const pv = projectValueStr ? parseFloat(projectValueStr.replace(/,/g, "")) : undefined;
+      await onConfirm(services.trim(), notes.trim(), pv && pv > 0 ? pv : undefined);
       onClose();
     } finally {
       setSubmitting(false);
@@ -85,6 +88,25 @@ export function ConvertToClientModal({
             />
             <p className="text-xs text-gray-500">Comma-separated list of what you're delivering.</p>
           </div>
+          {!isEdit && (
+            <div className="space-y-2">
+              <Label htmlFor="project-value" className="flex items-center gap-1.5">
+                <IndianRupee className="h-3.5 w-3.5 text-emerald-600" />
+                Project Value <span className="text-gray-400 font-normal">(optional)</span>
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 font-medium">₹</span>
+                <Input
+                  id="project-value"
+                  placeholder="50000"
+                  value={projectValueStr}
+                  onChange={(e) => setProjectValueStr(e.target.value.replace(/[^0-9,]/g, ""))}
+                  className="pl-7"
+                />
+              </div>
+              <p className="text-xs text-gray-500">Total quoted amount. Two payments (50%/50%) will be set up automatically.</p>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="notes">Notes <span className="text-gray-400 font-normal">(optional)</span></Label>
             <Input

@@ -1,8 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import type { Lead, Activity, UploadBatch, LeadStatus, ActivityLog, LeadRow, ActivityRow, UploadBatchRow, ActivityLogRow } from "@/types";
-import { mapLeadRow, mapActivityRow, mapBatchRow } from "@/types";
+import type { Lead, Activity, UploadBatch, LeadStatus, ActivityLog, LeadRow, ActivityRow, UploadBatchRow, ActivityLogRow, Payment, PaymentRow, PaymentMethod } from "@/types";
+import { mapLeadRow, mapActivityRow, mapBatchRow, mapPaymentRow } from "@/types";
 import { useAuth } from "./AuthContext";
 import { supabase } from "@/config/supabase";
 import { toast } from "sonner";
@@ -11,7 +11,9 @@ interface CRMContextType {
   leads: Lead[];
   activities: Activity[];
   batches: UploadBatch[];
+  manualBatches: UploadBatch[];
   activityLogs: ActivityLog[];
+  payments: Payment[];
   isLoadingData: boolean;
   addLead: (lead: Omit<Lead, "id" | "createdAt" | "lastActivity">) => void;
   updateLeadStatus: (leadId: string, status: LeadStatus) => void;
@@ -24,9 +26,17 @@ interface CRMContextType {
   uploadExcelLeads: (leads: Omit<Lead, "id" | "createdAt" | "lastActivity">[], batch: Omit<UploadBatch, "id">) => void;
   archiveBatch: (batchId: string) => void;
   deleteBatch: (batchId: string) => void;
-  convertToClient: (leadIds: string[], services: string, notes?: string) => Promise<void>;
+  createManualBatch: (name: string) => Promise<UploadBatch | null>;
+  renameManualBatch: (batchId: string, name: string) => Promise<void>;
+  updateLeadBatch: (leadId: string, batchId: string | null) => Promise<void>;
+  createPaymentsForClient: (leadId: string, projectValue: number) => Promise<void>;
+  markPaymentPaid: (paymentId: string, data: { paidDate: string; method: PaymentMethod; reference?: string; notes?: string }) => Promise<void>;
+  updatePaymentDueDate: (paymentId: string, dueDate: string | null) => Promise<void>;
+  setProjectValue: (leadId: string, value: number) => Promise<void>;
+  addDirectClient: (data: { businessName: string; phone: string; email?: string; website?: string; services?: string; notes?: string; projectStatus?: string; projectValue?: number; becameClientAt?: string; projectStartedAt?: string; projectDeliveredAt?: string }) => Promise<void>;
+  convertToClient: (leadIds: string[], services: string, notes?: string, projectValue?: number) => Promise<void>;
   revertToLead: (leadIds: string[]) => Promise<void>;
-  updateClientInfo: (leadId: string, services: string, notes?: string) => Promise<void>;
+  updateClientInfo: (leadId: string, data: { services?: string; notes?: string; projectStatus?: string; website?: string; becameClientAt?: string; projectStartedAt?: string; projectDeliveredAt?: string }) => Promise<void>;
   bulkUpdateStatus: (leadIds: string[], status: LeadStatus) => Promise<void>;
   bulkAssign: (leadIds: string[], assigneeName: string) => Promise<void>;
   bulkArchive: (leadIds: string[]) => Promise<void>;
@@ -56,7 +66,9 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [batches, setBatches] = useState<UploadBatch[]>([]);
+  const [manualBatches, setManualBatches] = useState<UploadBatch[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   // Maps for resolving UUIDs to Names — use refs to avoid re-render loops
@@ -88,17 +100,19 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     
     try {
       // Parallel fetch for performance
-      const [leadsRes, activitiesRes, batchesRes, logsRes] = await Promise.all([
+      const [leadsRes, activitiesRes, batchesRes, logsRes, paymentsRes] = await Promise.all([
         supabase.from("leads").select("*").order("created_at", { ascending: false }),
         supabase.from("activities").select("*").order("created_at", { ascending: false }),
         supabase.from("upload_batches").select("*").order("created_at", { ascending: false }),
-        supabase.from("activity_logs").select("*").order("created_at", { ascending: false }).limit(200)
+        supabase.from("activity_logs").select("*").order("created_at", { ascending: false }).limit(200),
+        supabase.from("payments").select("*").order("created_at", { ascending: true }),
       ]);
 
       if (leadsRes.error) throw leadsRes.error;
       if (activitiesRes.error) throw activitiesRes.error;
       if (batchesRes.error) throw batchesRes.error;
       if (logsRes.error) throw logsRes.error;
+      // payments table may not exist yet — ignore error gracefully
 
       // Build lead_id -> latest activity timestamp once (O(N+M) instead of O(N*M)).
       // Activities are already sorted DESC by created_at, so the first hit is the latest.
@@ -122,8 +136,10 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
       });
       
       const mappedActivities = (activitiesRes.data as ActivityRow[]).map(r => mapActivityRow(r, namesMap));
-      const mappedBatches = (batchesRes.data as UploadBatchRow[]).map(r => mapBatchRow(r, namesMap));
-      
+      const allMappedBatches = (batchesRes.data as UploadBatchRow[]).map(r => mapBatchRow(r, namesMap));
+      const mappedBatches = allMappedBatches.filter(b => b.location !== '__manual__');
+      const mappedManualBatches = allMappedBatches.filter(b => b.location === '__manual__');
+
       const mappedLogs = (logsRes.data as ActivityLogRow[]).map(r => ({
         id: r.id,
         userId: r.user_id || undefined,
@@ -136,10 +152,14 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         details: r.details || undefined
       }));
 
+      const mappedPayments = paymentsRes.error ? [] : (paymentsRes.data as PaymentRow[]).map(mapPaymentRow);
+
       setLeads(mappedLeads);
       setActivities(mappedActivities);
       setBatches(mappedBatches);
+      setManualBatches(mappedManualBatches);
       setActivityLogs(mappedLogs);
+      setPayments(mappedPayments);
 
     } catch (e) {
       console.error("Failed to load CRM data from Supabase:", e);
@@ -480,6 +500,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     try {
       // Optimistic locally
       setBatches(prev => prev.filter(b => b.id !== batchId));
+      setManualBatches(prev => prev.filter(b => b.id !== batchId));
       setLeads(prev => prev.filter(l => l.batchId !== batchId));
       
       // Delete activities of these leads first to avoid FK constraint issues
@@ -503,23 +524,156 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     }
   }, [leads, loadData, addLog]);
 
+  const createManualBatch = useCallback(async (name: string): Promise<UploadBatch | null> => {
+    try {
+      const { data, error } = await supabase.from("upload_batches").insert([{
+        file_name: name,
+        location: "__manual__",
+        niche: null,
+        lead_count: 0,
+        uploaded_by: user?.id || null,
+      }]).select().single();
+      if (error) throw error;
+      if (data) {
+        const newBatch = mapBatchRow(data, idToNameMap);
+        setManualBatches(prev => [newBatch, ...prev]);
+        addLog("Created Manual Folder", "batch", data.id, name);
+        return newBatch;
+      }
+      return null;
+    } catch (e: any) {
+      console.error("Create manual batch error:", e);
+      toast.error(`Failed to create folder: ${e.message}`);
+      return null;
+    }
+  }, [user?.id, idToNameMap, addLog]);
+
+  const renameManualBatch = useCallback(async (batchId: string, name: string): Promise<void> => {
+    try {
+      setManualBatches(prev => prev.map(b => b.id === batchId ? { ...b, fileName: name } : b));
+      const { error } = await supabase.from("upload_batches").update({ file_name: name }).eq("id", batchId);
+      if (error) throw error;
+    } catch (e: any) {
+      console.error("Rename batch error:", e);
+      toast.error("Failed to rename folder");
+      loadData();
+    }
+  }, [loadData]);
+
+  const updateLeadBatch = useCallback(async (leadId: string, batchId: string | null): Promise<void> => {
+    try {
+      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, batchId: batchId ?? undefined } : l));
+      const { error } = await supabase
+        .from("leads")
+        .update({ batch_id: batchId, updated_at: new Date().toISOString() })
+        .eq("id", leadId);
+      if (error) throw error;
+      addLog("Moved Lead to Folder", "lead", leadId, undefined, { batch_id: batchId });
+    } catch (e: any) {
+      console.error("Move lead error:", e);
+      toast.error("Failed to move lead");
+      loadData();
+    }
+  }, [loadData, addLog]);
+
+  // ── Payments ────────────────────────────────────────────────────
+  const createPaymentsForClient = useCallback(async (leadId: string, projectValue: number): Promise<void> => {
+    if (!projectValue || projectValue <= 0) return;
+    const half = Math.round(projectValue / 2);
+    const rows = [
+      { lead_id: leadId, type: "upfront", amount: half, status: "pending" },
+      { lead_id: leadId, type: "final",   amount: projectValue - half, status: "pending" },
+    ];
+    const { data, error } = await supabase.from("payments").insert(rows).select();
+    if (error) { console.error("Create payments error:", error); return; }
+    if (data) setPayments(prev => [...prev, ...(data as PaymentRow[]).map(mapPaymentRow)]);
+  }, []);
+
+  const markPaymentPaid = useCallback(async (paymentId: string, data: { paidDate: string; method: PaymentMethod; reference?: string; notes?: string }): Promise<void> => {
+    try {
+      setPayments(prev => prev.map(p => p.id === paymentId
+        ? { ...p, status: "paid", paidDate: data.paidDate, paymentMethod: data.method, reference: data.reference, notes: data.notes }
+        : p));
+      const { error } = await supabase.from("payments").update({
+        status: "paid",
+        paid_date: data.paidDate,
+        payment_method: data.method || null,
+        reference: data.reference || null,
+        notes: data.notes || null,
+      }).eq("id", paymentId);
+      if (error) throw error;
+      addLog("Payment Marked Paid", "payment", paymentId);
+      toast.success("Payment recorded");
+    } catch (e: any) {
+      console.error("Mark payment paid error:", e);
+      toast.error("Failed to update payment");
+      loadData();
+    }
+  }, [loadData, addLog]);
+
+  const updatePaymentDueDate = useCallback(async (paymentId: string, dueDate: string | null): Promise<void> => {
+    try {
+      setPayments(prev => prev.map(p => p.id === paymentId ? { ...p, dueDate: dueDate ?? undefined } : p));
+      const { error } = await supabase.from("payments").update({ due_date: dueDate }).eq("id", paymentId);
+      if (error) throw error;
+    } catch (e: any) {
+      console.error("Update due date error:", e);
+      toast.error("Failed to update due date");
+      loadData();
+    }
+  }, [loadData]);
+
+  const setProjectValue = useCallback(async (leadId: string, value: number): Promise<void> => {
+    try {
+      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, projectValue: value } : l));
+      const { error } = await supabase.from("leads").update({ project_value: value }).eq("id", leadId);
+      if (error) throw error;
+      // Update existing payment amounts to reflect the new project value (50/50 split)
+      const half = Math.round(value / 2);
+      setPayments(prev => {
+        const clientPayments = prev.filter(p => p.leadId === leadId);
+        if (clientPayments.length === 0) return prev;
+        const upfront = clientPayments.find(p => p.type === "upfront");
+        const final   = clientPayments.find(p => p.type === "final");
+        if (upfront) supabase.from("payments").update({ amount: half }).eq("id", upfront.id).then(() => {});
+        if (final)   supabase.from("payments").update({ amount: value - half }).eq("id", final.id).then(() => {});
+        return prev.map(p => {
+          if (p.leadId !== leadId) return p;
+          if (p.type === "upfront") return { ...p, amount: half };
+          if (p.type === "final")   return { ...p, amount: value - half };
+          return p;
+        });
+      });
+      addLog("Set Project Value", "lead", leadId, undefined, { value });
+      toast.success("Project value updated");
+    } catch (e: any) {
+      console.error("Set project value error:", e);
+      toast.error("Failed to set project value");
+      loadData();
+    }
+  }, [loadData, addLog]);
+
   // ── Client conversion + bulk actions ────────────────────────────
-  const convertToClient = useCallback(async (leadIds: string[], services: string, notes?: string) => {
+  const convertToClient = useCallback(async (leadIds: string[], services: string, notes?: string, projectValue?: number) => {
     if (leadIds.length === 0) return;
     const becameAt = new Date().toISOString();
-    const updates = {
+    const dbUpdates: Record<string, unknown> = {
       is_client: true,
       became_client_at: becameAt,
       client_services: services || null,
       client_notes: notes || null,
       updated_at: becameAt,
     };
+    if (projectValue && projectValue > 0) dbUpdates.project_value = projectValue;
     try {
       setLeads(prev => prev.map(l => leadIds.includes(l.id)
-        ? { ...l, isClient: true, becameClientAt: becameAt, clientServices: services || undefined, clientNotes: notes || undefined }
+        ? { ...l, isClient: true, becameClientAt: becameAt, clientServices: services || undefined, clientNotes: notes || undefined, projectValue: projectValue || undefined }
         : l));
-      const { error } = await supabase.from("leads").update(updates as Record<string, unknown>).in("id", leadIds);
+      const { error } = await supabase.from("leads").update(dbUpdates).in("id", leadIds);
       if (error) throw error;
+      if (projectValue && projectValue > 0) {
+        for (const id of leadIds) await createPaymentsForClient(id, projectValue);
+      }
       addLog(`Converted ${leadIds.length} lead(s) to client`, "lead", leadIds[0], undefined, { count: leadIds.length, services });
       toast.success(`${leadIds.length} lead${leadIds.length > 1 ? "s" : ""} converted to client${leadIds.length > 1 ? "s" : ""}`);
     } catch (e: unknown) {
@@ -528,7 +682,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
       toast.error(msg);
       loadData();
     }
-  }, [loadData, addLog]);
+  }, [loadData, addLog, createPaymentsForClient]);
 
   const revertToLead = useCallback(async (leadIds: string[]) => {
     if (leadIds.length === 0) return;
@@ -550,15 +704,62 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loadData, addLog]);
 
-  const updateClientInfo = useCallback(async (leadId: string, services: string, notes?: string) => {
+  const addDirectClient = useCallback(async (data: {
+    businessName: string; phone: string; email?: string; website?: string;
+    services?: string; notes?: string; projectStatus?: string; projectValue?: number;
+    becameClientAt?: string; projectStartedAt?: string; projectDeliveredAt?: string;
+  }) => {
+    try {
+      const becameAt = data.becameClientAt || new Date().toISOString();
+      const dbLead: Record<string, unknown> = {
+        business_name: data.businessName,
+        phone: data.phone,
+        email: data.email || null,
+        website: data.website || null,
+        status: "closed_won",
+        source: "manual",
+        is_client: true,
+        became_client_at: becameAt,
+        client_services: data.services || null,
+        client_notes: data.notes || null,
+        project_status: data.projectStatus || "in_progress",
+        assigned_to: user?.id || null,
+        uploaded_by: user?.id || null,
+        updated_at: becameAt,
+      };
+      if (data.projectValue && data.projectValue > 0) dbLead.project_value = data.projectValue;
+      const { data: row, error } = await supabase.from("leads").insert([dbLead]).select().single();
+      if (error) throw error;
+      if (row) {
+        const newLead = mapLeadRow(row, idToNameMap);
+        newLead.lastActivity = "Just now";
+        newLead.isArchived = false;
+        setLeads(prev => [newLead, ...prev]);
+        addLog("Added Client Directly", "lead", row.id, data.businessName);
+        if (data.projectValue && data.projectValue > 0) {
+          await createPaymentsForClient(row.id, data.projectValue);
+        }
+        toast.success("Client added");
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to add client";
+      console.error("Add direct client error:", e);
+      toast.error(msg);
+    }
+  }, [user?.id, idToNameMap, addLog, createPaymentsForClient]);
+
+  const updateClientInfo = useCallback(async (leadId: string, data: { services?: string; notes?: string; projectStatus?: string; website?: string; becameClientAt?: string; projectStartedAt?: string; projectDeliveredAt?: string }) => {
     try {
       setLeads(prev => prev.map(l => l.id === leadId
-        ? { ...l, clientServices: services || undefined, clientNotes: notes || undefined }
+        ? { ...l, clientServices: data.services ?? l.clientServices, clientNotes: data.notes ?? l.clientNotes, projectStatus: data.projectStatus ?? l.projectStatus, website: data.website ?? l.website, becameClientAt: data.becameClientAt ?? l.becameClientAt, projectStartedAt: data.projectStartedAt ?? l.projectStartedAt, projectDeliveredAt: data.projectDeliveredAt ?? l.projectDeliveredAt }
         : l));
-      const { error } = await supabase
-        .from("leads")
-        .update({ client_services: services || null, client_notes: notes || null, updated_at: new Date().toISOString() } as Record<string, unknown>)
-        .eq("id", leadId);
+      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (data.services !== undefined) updates.client_services = data.services || null;
+      if (data.notes !== undefined) updates.client_notes = data.notes || null;
+      if (data.projectStatus !== undefined) updates.project_status = data.projectStatus || null;
+      if (data.website !== undefined) updates.website = data.website || null;
+      if (data.becameClientAt !== undefined) updates.became_client_at = data.becameClientAt || null;
+      const { error } = await supabase.from("leads").update(updates).eq("id", leadId);
       if (error) throw error;
       toast.success("Client info updated");
     } catch (e) {
@@ -643,7 +844,9 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         leads,
         activities,
         batches,
+        manualBatches,
         activityLogs,
+        payments,
         isLoadingData,
         addLead,
         updateLeadStatus,
@@ -656,6 +859,14 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         uploadExcelLeads,
         archiveBatch,
         deleteBatch,
+        createManualBatch,
+        renameManualBatch,
+        updateLeadBatch,
+        createPaymentsForClient,
+        markPaymentPaid,
+        updatePaymentDueDate,
+        setProjectValue,
+        addDirectClient,
         convertToClient,
         revertToLead,
         updateClientInfo,
