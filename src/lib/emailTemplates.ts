@@ -244,7 +244,7 @@ export function reminderDueEmail(opts: {
   leadName: string;
   note: string;
   dueDate: string;
-  when: "today" | "tomorrow" | "soon";
+  when: "today" | "tomorrow" | "soon" | "overdue";
   leadUrl: string;
 }): { subject: string; html: string } {
   const due = new Date(opts.dueDate);
@@ -252,33 +252,40 @@ export function reminderDueEmail(opts: {
   const timeFmt = due.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
   const isToday = opts.when === "today";
   const isSoon = opts.when === "soon";
+  const isOverdue = opts.when === "overdue";
 
-  const eyebrow = isSoon ? "Due Soon" : isToday ? "Due Today" : "Due Tomorrow";
-  const eyebrowColor = isSoon || isToday ? "#ef4444" : BRAND.accent;
-  const bgColor = isSoon || isToday ? "#fef2f2" : "#fffbeb";
-  const borderColor = isSoon || isToday ? "#ef4444" : BRAND.accent;
-  const textColor = isSoon || isToday ? "#7f1d1d" : "#78350f";
+  const eyebrow = isOverdue ? "Overdue" : isSoon ? "Due Soon" : isToday ? "Due Today" : "Due Tomorrow";
+  const eyebrowColor = isOverdue || isSoon || isToday ? "#ef4444" : BRAND.accent;
+  const bgColor = isOverdue || isSoon || isToday ? "#fef2f2" : "#fffbeb";
+  const borderColor = isOverdue || isSoon || isToday ? "#ef4444" : BRAND.accent;
+  const textColor = isOverdue || isSoon || isToday ? "#7f1d1d" : "#78350f";
 
-  const heading = isSoon
-    ? `Hi ${escape(firstName(opts.recipientName))}, ${escape(opts.leadName)} is up at ${timeFmt}.`
-    : isToday
-      ? `Hi ${escape(firstName(opts.recipientName))}, follow up with ${escape(opts.leadName)} today.`
-      : `Heads up — ${escape(opts.leadName)} is on tomorrow's list.`;
+  const heading = isOverdue
+    ? `Hi ${escape(firstName(opts.recipientName))}, a follow-up with ${escape(opts.leadName)} was missed.`
+    : isSoon
+      ? `Hi ${escape(firstName(opts.recipientName))}, ${escape(opts.leadName)} is up at ${timeFmt}.`
+      : isToday
+        ? `Hi ${escape(firstName(opts.recipientName))}, follow up with ${escape(opts.leadName)} today.`
+        : `Heads up — ${escape(opts.leadName)} is on tomorrow's list.`;
 
-  const preview = isSoon
-    ? `Follow up at ${timeFmt}: ${opts.leadName}`
-    : isToday
-      ? `Follow up today: ${opts.leadName}`
-      : `Reminder tomorrow: ${opts.leadName}`;
+  const preview = isOverdue
+    ? `Overdue follow-up: ${opts.leadName}`
+    : isSoon
+      ? `Follow up at ${timeFmt}: ${opts.leadName}`
+      : isToday
+        ? `Follow up today: ${opts.leadName}`
+        : `Reminder tomorrow: ${opts.leadName}`;
 
-  const subject = isSoon
-    ? `Follow up at ${timeFmt}: ${opts.leadName}`
-    : isToday
-      ? `Follow up today: ${opts.leadName}`
-      : `Reminder tomorrow: ${opts.leadName}`;
+  const subject = isOverdue
+    ? `Overdue follow-up: ${opts.leadName}`
+    : isSoon
+      ? `Follow up at ${timeFmt}: ${opts.leadName}`
+      : isToday
+        ? `Follow up today: ${opts.leadName}`
+        : `Reminder tomorrow: ${opts.leadName}`;
 
-  const dueLabel = isSoon ? "Due at" : isToday ? "Due today" : "Due tomorrow";
-  const dueValue = isSoon ? `${timeFmt} · ${dateFmt}` : dateFmt;
+  const dueLabel = isOverdue ? "Was due" : isSoon ? "Due at" : isToday ? "Due today" : "Due tomorrow";
+  const dueValue = isOverdue || isSoon ? `${timeFmt} · ${dateFmt}` : dateFmt;
 
   const html = layout({
     preview,

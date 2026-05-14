@@ -29,7 +29,13 @@ function getServiceClient(): SupabaseClient {
 interface TeamMember { id: string; email: string; name: string; role: string; notify_all?: boolean; notifications_enabled?: boolean }
 
 async function getAllTeamMembers(): Promise<TeamMember[]> {
-  const { data } = await getServiceClient().from("users").select("id, email, name, role, notify_all, notifications_enabled");
+  const { data, error } = await getServiceClient().from("users").select("id, email, name, role, notify_all, notifications_enabled");
+  if (error) {
+    // Columns notify_all / notifications_enabled may not exist yet — fall back to base columns.
+    // All users will be treated as notification-enabled (safe default).
+    const { data: fallback } = await getServiceClient().from("users").select("id, email, name, role");
+    return (fallback as TeamMember[] | null) || [];
+  }
   return (data as TeamMember[] | null) || [];
 }
 
@@ -373,7 +379,7 @@ export async function notifyWebsiteLeadCreated(leadId: string) {
   };
 }
 
-export async function notifyReminderDue(activityId: string, when: "today" | "tomorrow" | "soon") {
+export async function notifyReminderDue(activityId: string, when: "today" | "tomorrow" | "soon" | "overdue") {
   const supabase = getServiceClient();
   const { data: act } = await supabase
     .from("activities")
@@ -405,6 +411,7 @@ export async function notifyReminderDue(activityId: string, when: "today" | "tom
   const kind =
     when === "today" ? "reminder_today" :
     when === "tomorrow" ? "reminder_tomorrow" :
+    when === "overdue" ? "reminder_overdue" :
     "reminder_soon";
   return fanOut({
     kind,

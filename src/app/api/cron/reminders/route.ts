@@ -31,7 +31,11 @@ export async function GET(req: NextRequest) {
   // Hourly cron + dedup → each activity gets exactly one "soon" email roughly 2h before.
   const soonWindowEnd = new Date(now.getTime() + 1000 * 60 * 60 * 2.5);
 
-  const [tomorrowRes, todayRes, soonRes] = await Promise.all([
+  // "Overdue" window: past-due reminders from the last 7 days that were never notified.
+  // Dedup via notification_log ensures each activity only fires once.
+  const overdueWindowStart = new Date(now.getTime() - 1000 * 60 * 60 * 24 * 7);
+
+  const [tomorrowRes, todayRes, soonRes, overdueRes] = await Promise.all([
     supabase
       .from("activities")
       .select("id")
@@ -47,12 +51,18 @@ export async function GET(req: NextRequest) {
       .select("id")
       .gte("reminder_date", now.toISOString())
       .lt("reminder_date", soonWindowEnd.toISOString()),
+    supabase
+      .from("activities")
+      .select("id")
+      .gte("reminder_date", overdueWindowStart.toISOString())
+      .lt("reminder_date", startOfToday.toISOString()),
   ]);
 
   const totals = {
     tomorrow: { sent: 0, skipped: 0 },
     today: { sent: 0, skipped: 0 },
     soon: { sent: 0, skipped: 0 },
+    overdue: { sent: 0, skipped: 0 },
   };
 
   for (const row of (tomorrowRes.data as Array<{ id: string }> | null) || []) {
@@ -70,6 +80,11 @@ export async function GET(req: NextRequest) {
     totals.soon.sent += r.sent;
     totals.soon.skipped += r.skipped;
   }
+  for (const row of (overdueRes.data as Array<{ id: string }> | null) || []) {
+    const r = await notifyReminderDue(row.id, "overdue");
+    totals.overdue.sent += r.sent;
+    totals.overdue.skipped += r.skipped;
+  }
 
   return NextResponse.json({
     ok: true,
@@ -79,6 +94,7 @@ export async function GET(req: NextRequest) {
       tomorrow: tomorrowRes.data?.length || 0,
       today: todayRes.data?.length || 0,
       soon: soonRes.data?.length || 0,
+      overdue: overdueRes.data?.length || 0,
     },
   });
 }
