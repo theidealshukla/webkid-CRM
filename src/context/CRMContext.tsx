@@ -23,6 +23,8 @@ interface CRMContextType {
   deleteLead: (leadId: string) => void;
   assignLead: (leadId: string, assignee: string) => void;
   addActivity: (activity: Omit<Activity, "id">) => void;
+  deleteActivity: (activityId: string) => Promise<void>;
+  rescheduleActivity: (activityId: string, newDate: string) => Promise<void>;
   uploadExcelLeads: (leads: Omit<Lead, "id" | "createdAt" | "lastActivity">[], batch: Omit<UploadBatch, "id">) => void;
   archiveBatch: (batchId: string) => void;
   deleteBatch: (batchId: string) => void;
@@ -425,6 +427,30 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user?.id, idToNameMap, addLog]);
 
+
+  const deleteActivity = useCallback(async (activityId: string) => {
+    try {
+      const { error } = await supabase.from("activities").delete().eq("id", activityId);
+      if (error) throw error;
+      setActivities(prev => prev.filter(a => a.id !== activityId));
+      addLog("Deleted Activity", "activity", activityId);
+    } catch (e) {
+      console.error("Delete activity error:", e);
+      toast.error("Failed to delete reminder");
+    }
+  }, [addLog]);
+
+  const rescheduleActivity = useCallback(async (activityId: string, newDate: string) => {
+    try {
+      const { error } = await supabase.from("activities").update({ reminder_date: newDate }).eq("id", activityId);
+      if (error) throw error;
+      setActivities(prev => prev.map(a => a.id === activityId ? { ...a, reminderDate: newDate } : a));
+      addLog("Rescheduled Activity", "activity", activityId);
+    } catch (e) {
+      console.error("Reschedule activity error:", e);
+      toast.error("Failed to reschedule reminder");
+    }
+  }, [addLog]);
 
   const uploadExcelLeads = useCallback(async (newLeads: Omit<Lead, "id" | "createdAt" | "lastActivity">[], batchInfo: Omit<UploadBatch, "id">) => {
     try {
@@ -869,6 +895,8 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         deleteLead,
         assignLead,
         addActivity,
+        deleteActivity,
+        rescheduleActivity,
         uploadExcelLeads,
         archiveBatch,
         deleteBatch,

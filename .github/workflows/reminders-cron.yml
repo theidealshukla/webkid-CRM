@@ -45,9 +45,13 @@ jobs:
             exit 1
           fi
 
-          # DNS / TLS reachability probe with verbose output if it fails.
-          if ! curl -sSf --max-time 10 --head "$REMINDER_URL" >/dev/null 2>/tmp/probe; then
-            echo "::warning::HEAD probe failed — printing verbose connect diagnostics:"
+          # DNS / TLS reachability probe. 401 is expected (no secret sent) and means the server
+          # is up. Only warn on connection-level failures (exit codes other than 0 or 22).
+          probe_status=$(curl -o /dev/null -w "%{http_code}" -sS --max-time 10 --head "$REMINDER_URL" 2>/tmp/probe || echo "ERR")
+          if [ "$probe_status" = "401" ] || [ "$probe_status" = "200" ]; then
+            echo "Reachability probe: $probe_status (server is up)"
+          else
+            echo "::warning::Reachability probe returned $probe_status — verbose diagnostics:"
             curl -v --max-time 15 --head "$REMINDER_URL" 2>&1 | sed -E 's/(x-cron-secret: ).*/\1***REDACTED***/i' || true
             echo "----"
             cat /tmp/probe || true
