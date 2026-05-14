@@ -3,6 +3,7 @@ import { sendEmail } from "./email";
 import {
   leadCreatedEmail,
   batchUploadedEmail,
+  batchReadyEmail,
   statusChangedEmail,
   leadAssignedEmail,
   reminderSetEmail,
@@ -25,10 +26,10 @@ function getServiceClient(): SupabaseClient {
   return cachedClient;
 }
 
-interface TeamMember { id: string; email: string; name: string; role: string }
+interface TeamMember { id: string; email: string; name: string; role: string; notify_all?: boolean; notifications_enabled?: boolean }
 
 async function getAllTeamMembers(): Promise<TeamMember[]> {
-  const { data } = await getServiceClient().from("users").select("id, email, name, role");
+  const { data } = await getServiceClient().from("users").select("id, email, name, role, notify_all, notifications_enabled");
   return (data as TeamMember[] | null) || [];
 }
 
@@ -86,6 +87,7 @@ async function fanOut<T extends { subject: string; html: string }>(opts: {
   let sent = 0, skipped = 0;
   await Promise.all(opts.recipients.map(async (u) => {
     if (!u.email) { skipped++; return; }
+    if (u.notifications_enabled === false) { skipped++; return; }
     if (await alreadySent(opts.kind, opts.entityId, u.email)) { skipped++; return; }
 
     const { subject, html } = opts.build(u);
@@ -215,18 +217,24 @@ export async function notifyLeadAssigned(leadId: string, assigneeId: string, ass
     .single();
   if (!lead) return { sent: 0, skipped: 0, reason: "lead-not-found" };
 
-  const [assignee, assignedBy] = await Promise.all([
+  const [assignee, assignedBy, allMembers] = await Promise.all([
     getUserById(assigneeId),
     assignedById ? getUserById(assignedById) : Promise.resolve(null),
+    getAllTeamMembers(),
   ]);
   if (!assignee) return { sent: 0, skipped: 0, reason: "assignee-not-found" };
 
-  // Use unique entity_id per assignment by appending assignee id.
+  // Admins with notify_all=true also receive assignment emails
+  const notifyAllAdmins = allMembers.filter(
+    (m) => m.role === "admin" && m.notify_all && m.id !== assigneeId
+  );
+  const recipients = [assignee, ...notifyAllAdmins];
+
   return fanOut({
     kind: "lead_assigned",
     entityType: "lead",
     entityId: `${leadId}:${assigneeId}`,
-    recipients: [assignee],
+    recipients,
     build: (u) => leadAssignedEmail({
       recipientName: u.name,
       leadName: lead.business_name,
@@ -406,6 +414,46 @@ export async function notifyReminderDue(activityId: string, when: "today" | "tom
       dueDate: act.reminder_date as string,
       when,
       leadUrl: `${APP_URL}/crm/leads/${act.lead_id}`,
+    }),
+  });
+}
+
+export async function notifyBatchReady(batchId: string, triggeredById: string) {
+  const supabase = getServiceClient();
+
+  const [{ data: batch }, { count: leadCount }, triggeredBy, recipients] = await Promise.all([
+    supabase
+      .from("upload_batches")
+      .select("id, file_name, niche, note")
+      .eq("id", batchId)
+      .single(),
+    supabase
+      .from("leads")
+      .select("*", { count: "exact", head: true })
+      .eq("batch_id", batchId)
+      .eq("is_archived", false),
+    getUserById(triggeredById),
+    getAllTeamMembers(),
+  ]);
+
+  if (!batch) return { sent: 0, skipped: 0, reason: "batch-not-found" };
+
+  // Bucket by 10-minute window so double-clicking doesn't spam, but re-notifying later works
+  const bucket = Math.floor(Date.now() / 600_000);
+
+  return fanOut({
+    kind: "batch_ready",
+    entityType: "batch",
+    entityId: `${batchId}:${bucket}`,
+    recipients,
+    build: (u) => batchReadyEmail({
+      recipientName: u.name,
+      folderName: batch.file_name,
+      leadCount: leadCount ?? 0,
+      niche: batch.niche,
+      note: batch.note,
+      triggeredBy: triggeredBy?.name || "A teammate",
+      batchUrl: `${APP_URL}/crm/manual-leads`,
     }),
   });
 }

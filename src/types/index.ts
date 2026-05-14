@@ -145,6 +145,7 @@ export interface UploadBatch {
   leadCount: number;
   uploadedBy: string;             // UUID in DB
   uploadedByName?: string;        // Resolved display name
+  note?: string;
 }
 
 // Raw DB row for upload_batches
@@ -156,6 +157,7 @@ export interface UploadBatchRow {
   lead_count: number;
   uploaded_by: string | null;
   created_at: string;
+  note?: string | null;
 }
 
 export interface User {
@@ -291,6 +293,7 @@ export function mapBatchRow(row: UploadBatchRow, usersMap: Map<string, string>):
     leadCount: row.lead_count,
     uploadedBy: row.uploaded_by || "",
     uploadedByName: row.uploaded_by ? usersMap.get(row.uploaded_by) || "Unknown" : "Unknown",
+    note: row.note || undefined,
   };
 }
 

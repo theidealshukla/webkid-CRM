@@ -458,6 +458,41 @@ export function websiteLeadUserEmail(opts: {
   return { subject: `Thanks for reaching out, ${opts.name} — we'll be in touch`, html };
 }
 
+export function batchReadyEmail(opts: {
+  recipientName: string;
+  folderName: string;
+  leadCount: number;
+  niche?: string | null;
+  note?: string | null;
+  triggeredBy: string;
+  batchUrl: string;
+}): { subject: string; html: string } {
+  const noteBlock = opts.note
+    ? `<blockquote style="margin:20px 0 0;padding:14px 16px;background:#f9fafb;border-left:3px solid ${BRAND.primary};border-radius:6px;font-size:14px;line-height:1.6;color:#374151;">${escape(opts.note)}</blockquote>`
+    : "";
+  const html = layout({
+    preview: `${opts.folderName} · ${opts.leadCount} leads ready`,
+    eyebrow: "Leads Ready for Action",
+    eyebrowColor: "#6366f1",
+    heading: `Hi ${escape(firstName(opts.recipientName))}, new leads are waiting.`,
+    body: `<p style="margin:0;">
+      <strong>${escape(opts.triggeredBy)}</strong> has finished adding leads to
+      <strong>${escape(opts.folderName)}</strong>. ${opts.leadCount} lead${opts.leadCount !== 1 ? "s" : ""} ${opts.leadCount !== 1 ? "are" : "is"} ready for outreach.
+    </p>${noteBlock}`,
+    meta: [
+      { label: "Folder", value: opts.folderName },
+      { label: "Leads", value: String(opts.leadCount) },
+      ...(opts.niche ? [{ label: "Niche", value: opts.niche }] : []),
+      { label: "Pushed by", value: opts.triggeredBy },
+    ],
+    cta: { label: "View leads", href: opts.batchUrl },
+  });
+  return {
+    subject: `${opts.leadCount} leads ready · ${opts.folderName}`,
+    html,
+  };
+}
+
 export function testEmail(opts: { recipientName: string }): { subject: string; html: string } {
   const html = layout({
     preview: "Webkid CRM email pipeline test",

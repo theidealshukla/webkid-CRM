@@ -38,9 +38,11 @@ import {
   X,
   FolderInput,
   Clipboard,
+  Bell,
 } from "lucide-react";
 import { useCRM } from "@/context/CRMContext";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/config/supabase";
 import { useDebounce } from "@/hooks/useDebounce";
 import { LeadRow, MobileLeadCard } from "../leads/components/LeadRow";
 import LeadTableSkeleton from "../leads/components/LeadTableSkeleton";
@@ -120,14 +122,32 @@ function FolderCard({
   onOpen,
   onRename,
   onDelete,
+  onUpdateNote,
 }: {
   batch: UploadBatch;
   leadCount: number;
   onOpen: () => void;
   onRename: (name: string) => void;
   onDelete: () => void;
+  onUpdateNote: (note: string) => void;
 }) {
   const [isRenaming, setIsRenaming] = useState(false);
+  const [isEditingNote, setIsEditingNote] = useState(false);
+  const [noteText, setNoteText] = useState(batch.note || "");
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setNoteText(batch.note || "");
+  }, [batch.note]);
+
+  useEffect(() => {
+    if (isEditingNote) noteRef.current?.focus();
+  }, [isEditingNote]);
+
+  const saveNote = () => {
+    onUpdateNote(noteText.trim());
+    setIsEditingNote(false);
+  };
 
   const createdDate = new Date(batch.uploadedAt).toLocaleDateString("en-US", {
     month: "short",
@@ -138,7 +158,7 @@ function FolderCard({
   return (
     <div
       className="relative group bg-white dark:bg-[#161618] border border-gray-100 dark:border-[#2c2c2e] rounded-2xl p-5 cursor-pointer hover:shadow-md hover:border-gray-200 dark:hover:border-[#363638] transition-all duration-200 hover:-translate-y-0.5 flex flex-col gap-3"
-      onClick={isRenaming ? undefined : onOpen}
+      onClick={isRenaming || isEditingNote ? undefined : onOpen}
     >
       {/* Top row: icon + action buttons */}
       <div className="flex items-start justify-between">
@@ -168,7 +188,7 @@ function FolderCard({
       </div>
 
       {/* Folder name — editable inline */}
-      <div className="flex-1 min-h-[2.5rem] flex flex-col justify-center">
+      <div className="flex-1 min-h-[2rem] flex flex-col justify-center">
         {isRenaming ? (
           <RenameInput
             value={batch.fileName}
@@ -194,6 +214,57 @@ function FolderCard({
               <Pencil className="h-3 w-3" />
             </button>
           </div>
+        )}
+      </div>
+
+      {/* Note */}
+      <div onClick={(e) => e.stopPropagation()}>
+        {isEditingNote ? (
+          <div className="flex flex-col gap-1.5">
+            <textarea
+              ref={noteRef}
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveNote(); }
+                if (e.key === "Escape") { setNoteText(batch.note || ""); setIsEditingNote(false); }
+              }}
+              placeholder="Add a note..."
+              rows={2}
+              className="w-full text-xs bg-gray-50 dark:bg-[#1e1e20] border border-gray-200 dark:border-[#363638] rounded-lg px-2 py-1.5 outline-none resize-none text-gray-700 dark:text-[#c0c0c2] placeholder:text-gray-300 dark:placeholder:text-[#48484a]"
+            />
+            <div className="flex gap-1 justify-end">
+              <button
+                onClick={() => { setNoteText(batch.note || ""); setIsEditingNote(false); }}
+                className="text-[10px] font-medium text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-2 py-0.5 rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveNote}
+                className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 px-2 py-0.5 rounded"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        ) : batch.note ? (
+          <button
+            onClick={() => setIsEditingNote(true)}
+            className="w-full text-left group/note"
+            title="Click to edit note"
+          >
+            <p className="text-xs text-gray-400 dark:text-[#707072] line-clamp-2 group-hover/note:text-gray-600 dark:group-hover/note:text-[#a1a1a3] transition-colors">
+              {batch.note}
+            </p>
+          </button>
+        ) : (
+          <button
+            onClick={() => setIsEditingNote(true)}
+            className="text-xs text-gray-300 dark:text-[#48484a] hover:text-gray-400 dark:hover:text-[#636366] transition-colors italic"
+          >
+            + Add note
+          </button>
         )}
       </div>
 
@@ -328,6 +399,7 @@ export default function ManualLeadsPage() {
     manualBatches,
     createManualBatch,
     renameManualBatch,
+    updateBatchNote,
     updateLeadBatch,
     deleteBatch,
     updateLeadStatus,
@@ -343,6 +415,7 @@ export default function ManualLeadsPage() {
   const [selectedBatch, setSelectedBatch] = useState<UploadBatch | "unfiled" | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isJsonImportOpen, setIsJsonImportOpen] = useState(false);
+  const [isSendingNotif, setIsSendingNotif] = useState(false);
 
   // Selection
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
@@ -489,6 +562,26 @@ export default function ManualLeadsPage() {
     return leads.find((l) => l.id === movingLeadId)?.batchId;
   }, [movingLeadId, leads]);
 
+  const handleNotifyTeam = async (batchId: string) => {
+    setIsSendingNotif(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch("/api/notify/batch-ready", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ batchId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed");
+      toast.success(`Notification sent to ${json.sent} team member${json.sent !== 1 ? "s" : ""}`);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to send notification");
+    } finally {
+      setIsSendingNotif(false);
+    }
+  };
+
   const handleExport = async () => {
     try {
       const ExcelJS = await import("exceljs");
@@ -574,7 +667,19 @@ export default function ManualLeadsPage() {
             </div>
           </div>
           {selectedBatch !== "unfiled" && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                onClick={() => handleNotifyTeam(selectedBatch.id)}
+                disabled={isSendingNotif}
+                className="gap-2 rounded-xl shadow-sm h-10 px-4 font-semibold border-indigo-200 dark:border-indigo-800/50 text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
+              >
+                {isSendingNotif
+                  ? <span className="h-4 w-4 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
+                  : <Bell className="h-4 w-4" />
+                }
+                {isSendingNotif ? "Sending..." : "Notify Team"}
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => setIsJsonImportOpen(true)}
@@ -907,6 +1012,7 @@ export default function ManualLeadsPage() {
               onOpen={() => handleOpenBatch(batch)}
               onRename={(name) => renameManualBatch(batch.id, name)}
               onDelete={() => handleDeleteFolder(batch.id)}
+              onUpdateNote={(note) => updateBatchNote(batch.id, note)}
             />
           ))}
           {unfiledLeads.length > 0 && (

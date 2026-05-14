@@ -28,6 +28,7 @@ interface CRMContextType {
   deleteBatch: (batchId: string) => void;
   createManualBatch: (name: string) => Promise<UploadBatch | null>;
   renameManualBatch: (batchId: string, name: string) => Promise<void>;
+  updateBatchNote: (batchId: string, note: string) => Promise<void>;
   updateLeadBatch: (leadId: string, batchId: string | null) => Promise<void>;
   createPaymentsForClient: (leadId: string, projectValue: number) => Promise<void>;
   markPaymentPaid: (paymentId: string, data: { paidDate: string; method: PaymentMethod; reference?: string; notes?: string }) => Promise<void>;
@@ -560,6 +561,18 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loadData]);
 
+  const updateBatchNote = useCallback(async (batchId: string, note: string): Promise<void> => {
+    try {
+      setManualBatches(prev => prev.map(b => b.id === batchId ? { ...b, note: note || undefined } : b));
+      const { error } = await supabase.from("upload_batches").update({ note: note || null }).eq("id", batchId);
+      if (error) throw error;
+    } catch (e: any) {
+      console.error("Update batch note error:", e);
+      toast.error("Failed to save note");
+      loadData();
+    }
+  }, [loadData]);
+
   const updateLeadBatch = useCallback(async (leadId: string, batchId: string | null): Promise<void> => {
     try {
       setLeads(prev => prev.map(l => l.id === leadId ? { ...l, batchId: batchId ?? undefined } : l));
@@ -861,6 +874,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         deleteBatch,
         createManualBatch,
         renameManualBatch,
+        updateBatchNote,
         updateLeadBatch,
         createPaymentsForClient,
         markPaymentPaid,
