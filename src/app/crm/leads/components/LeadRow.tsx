@@ -24,6 +24,7 @@ import {
   Trash2,
   Briefcase,
   FolderOpen,
+  StickyNote,
 } from "lucide-react";
 import { TableRow, TableCell } from "@/components/ui/table";
 import type { Lead, LeadStatus } from "@/types";
@@ -204,6 +205,18 @@ const LeadRow = React.memo(function LeadRow({
 
         {/* Actions */}
         <TableCell className="w-[5%] py-3 text-right pr-4">
+          <div className="flex items-center justify-end gap-1">
+            <button
+              onClick={() => setActionDialog({ open: true, tab: "note" })}
+              title={lead.manualNotes ? "View / edit note" : "Add note"}
+              className={`h-8 w-8 inline-flex items-center justify-center rounded-lg transition-colors opacity-0 group-hover:opacity-100 ${
+                lead.manualNotes
+                  ? "text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 opacity-100"
+                  : "text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:text-indigo-400 dark:hover:bg-indigo-900/30"
+              }`}
+            >
+              <StickyNote className="h-4 w-4" />
+            </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="h-8 w-8 inline-flex items-center justify-center rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors text-gray-400">
@@ -251,6 +264,7 @@ const LeadRow = React.memo(function LeadRow({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </TableCell>
       </TableRow>
 
@@ -270,6 +284,7 @@ const LeadRow = React.memo(function LeadRow({
     prev.lead.assignedTo === next.lead.assignedTo &&
     prev.lead.assignedToName === next.lead.assignedToName &&
     prev.lead.lastActivity === next.lead.lastActivity &&
+    !!prev.lead.manualNotes === !!next.lead.manualNotes &&
     prev.index === next.index &&
     prev.selected === next.selected
   );
