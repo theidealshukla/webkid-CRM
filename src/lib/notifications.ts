@@ -35,10 +35,17 @@ async function getAllTeamMembers(): Promise<TeamMember[]> {
 
 async function getUsersById(ids: string[]): Promise<TeamMember[]> {
   if (ids.length === 0) return [];
-  const { data } = await getServiceClient().from("users").select("id, email, name, role").in("id", ids);
+  const { data } = await getServiceClient().from("users").select("id, email, name, role, notify_all, notifications_enabled").in("id", ids);
   return (data as TeamMember[] | null) || [];
 }
 
+/** Resolve a single user from an already-fetched list (avoids extra DB round-trip). */
+function findInList(list: TeamMember[], id: string | null | undefined): TeamMember | null {
+  if (!id) return null;
+  return list.find((m) => m.id === id) ?? null;
+}
+
+/** Only used when we do NOT already have the full team list loaded. */
 async function getUserById(id: string): Promise<TeamMember | null> {
   const { data } = await getServiceClient().from("users").select("id, email, name, role").eq("id", id).single();
   return (data as TeamMember | null) || null;
@@ -119,10 +126,9 @@ export async function notifyLeadCreated(leadId: string) {
   // Skip leads that are part of a batch — the batch INSERT sends a digest.
   if (lead.batch_id) return { sent: 0, skipped: 0, reason: "batch-lead" };
 
-  const [recipients, addedBy] = await Promise.all([
-    getAllTeamMembers(),
-    lead.uploaded_by ? getUserById(lead.uploaded_by) : Promise.resolve(null),
-  ]);
+  // Fetch all members once; resolve the uploader from that list (no extra query).
+  const recipients = await getAllTeamMembers();
+  const addedBy = findInList(recipients, lead.uploaded_by);
 
   return fanOut({
     kind: "lead_created",
@@ -150,10 +156,9 @@ export async function notifyBatchUploaded(batchId: string) {
     .single();
   if (!batch) return { sent: 0, skipped: 0, reason: "batch-not-found" };
 
-  const [recipients, uploadedBy] = await Promise.all([
-    getAllTeamMembers(),
-    batch.uploaded_by ? getUserById(batch.uploaded_by) : Promise.resolve(null),
-  ]);
+  // Fetch once; resolve uploader from in-memory list.
+  const recipients = await getAllTeamMembers();
+  const uploadedBy = findInList(recipients, batch.uploaded_by);
 
   return fanOut({
     kind: "batch_uploaded",
@@ -185,12 +190,10 @@ export async function notifyStatusChanged(leadId: string, oldStatus: string, new
     .single();
   if (!lead) return { sent: 0, skipped: 0, reason: "lead-not-found" };
 
-  const [recipients, changedBy] = await Promise.all([
-    getAllTeamMembers(),
-    changedById ? getUserById(changedById) : Promise.resolve(null),
-  ]);
+  // Fetch once; resolve the changer from in-memory list.
+  const recipients = await getAllTeamMembers();
+  const changedBy = findInList(recipients, changedById);
 
-  // Use a kind that includes the new status so a lead going won then lost both notify.
   const kind = `status_${newStatus}`;
   return fanOut({
     kind,
@@ -217,11 +220,10 @@ export async function notifyLeadAssigned(leadId: string, assigneeId: string, ass
     .single();
   if (!lead) return { sent: 0, skipped: 0, reason: "lead-not-found" };
 
-  const [assignee, assignedBy, allMembers] = await Promise.all([
-    getUserById(assigneeId),
-    assignedById ? getUserById(assignedById) : Promise.resolve(null),
-    getAllTeamMembers(),
-  ]);
+  // Single fetch; resolve assignee and assigner from in-memory list.
+  const allMembers = await getAllTeamMembers();
+  const assignee = findInList(allMembers, assigneeId);
+  const assignedBy = findInList(allMembers, assignedById);
   if (!assignee) return { sent: 0, skipped: 0, reason: "assignee-not-found" };
 
   // Admins with notify_all=true also receive assignment emails
@@ -253,13 +255,16 @@ export async function notifyReminderSet(activityId: string) {
     .single();
   if (!act || !act.reminder_date) return { sent: 0, skipped: 0, reason: "no-reminder" };
 
-  const [{ data: lead }, setBy] = await Promise.all([
+  // Parallel: fetch the lead AND all team members at once.
+  const [{ data: lead }, recipients] = await Promise.all([
     supabase.from("leads").select("id, business_name").eq("id", act.lead_id).single(),
-    act.user_id ? getUserById(act.user_id) : Promise.resolve(null),
+    getAllTeamMembers(),
   ]);
   if (!lead) return { sent: 0, skipped: 0, reason: "lead-not-found" };
 
-  const recipients = await getAllTeamMembers();
+  // Resolve the setter from the already-fetched list.
+  const setBy = findInList(recipients, act.user_id);
+
   return fanOut({
     kind: "reminder_set",
     entityType: "activity",
@@ -285,10 +290,9 @@ export async function notifyClientConverted(leadId: string, convertedById: strin
     .single();
   if (!lead) return { sent: 0, skipped: 0, reason: "lead-not-found" };
 
-  const [recipients, convertedBy] = await Promise.all([
-    getAllTeamMembers(),
-    convertedById ? getUserById(convertedById) : Promise.resolve(null),
-  ]);
+  // Fetch once; resolve converter from in-memory list.
+  const recipients = await getAllTeamMembers();
+  const convertedBy = findInList(recipients, convertedById);
 
   return fanOut({
     kind: "client_converted",
@@ -466,6 +470,7 @@ export async function notifyUserCreated(opts: {
   role: string;
   invitedById: string | null;
 }) {
+  // getUserById is fine here — welcome email is a one-off, no team list needed.
   const invitedBy = opts.invitedById ? await getUserById(opts.invitedById) : null;
 
   if (await alreadySent("user_welcome", opts.userId, opts.email)) {

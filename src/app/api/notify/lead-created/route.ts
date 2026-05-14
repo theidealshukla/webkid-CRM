@@ -1,27 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { z } from "zod";
+import { requireAuth, rateLimit, rateLimitKey, apiError, withErrorHandling } from "@/lib/api-utils";
 import { notifyLeadCreated } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return NextResponse.json({ error: "Server not configured" }, { status: 503 });
+const BodySchema = z.object({
+  id: z.string().uuid("Lead ID must be a valid UUID"),
+});
 
-  const authHeader = req.headers.get("authorization") || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const POST = withErrorHandling(async (req: NextRequest) => {
+  // Rate limit: 30 notifications per minute per IP
+  if (!rateLimit(rateLimitKey(req, "notify-lead"), 30, 60_000)) {
+    return apiError("Too many requests", 429);
+  }
 
-  const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data: userRes, error: authErr } = await supabase.auth.getUser(token);
-  if (authErr || !userRes?.user) return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
 
-  const body = await req.json().catch(() => ({}));
-  const { id } = body as { id?: string };
-  if (!id) return NextResponse.json({ error: "Lead ID required" }, { status: 400 });
+  const raw = await req.json().catch(() => null);
+  const parsed = BodySchema.safeParse(raw);
+  if (!parsed.success) {
+    return apiError(parsed.error.issues[0]?.message ?? "Invalid request body", 422);
+  }
 
-  const result = await notifyLeadCreated(id);
+  const result = await notifyLeadCreated(parsed.data.id);
   return NextResponse.json({ ok: true, ...result });
-}
+});

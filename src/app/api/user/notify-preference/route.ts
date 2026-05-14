@@ -1,39 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { requireAdmin, rateLimit, rateLimitKey, apiError, withErrorHandling } from "@/lib/api-utils";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function PATCH(req: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return NextResponse.json({ error: "Server not configured" }, { status: 503 });
+const BodySchema = z.object({
+  notifyAll: z.boolean(),
+});
 
-  const authHeader = req.headers.get("authorization") || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const PATCH = withErrorHandling(async (req: NextRequest) => {
+  if (!rateLimit(rateLimitKey(req, "notify-pref"), 10, 60_000)) {
+    return apiError("Too many requests", 429);
+  }
 
-  const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data: userRes, error: authErr } = await supabase.auth.getUser(token);
-  if (authErr || !userRes?.user) return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return auth.response;
 
-  // Only admins can set this preference
-  const { data: userRow } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", userRes.user.id)
-    .single();
-  if (userRow?.role !== "admin") return NextResponse.json({ error: "Admin only" }, { status: 403 });
+  const raw = await req.json().catch(() => null);
+  const parsed = BodySchema.safeParse(raw);
+  if (!parsed.success) {
+    return apiError(parsed.error.issues[0]?.message ?? "notifyAll (boolean) is required", 422);
+  }
 
-  const body = await req.json().catch(() => ({}));
-  const { notifyAll } = body as { notifyAll?: boolean };
-  if (typeof notifyAll !== "boolean") return NextResponse.json({ error: "notifyAll (boolean) required" }, { status: 400 });
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  );
 
   const { error } = await supabase
     .from("users")
-    .update({ notify_all: notifyAll })
-    .eq("id", userRes.user.id);
+    .update({ notify_all: parsed.data.notifyAll })
+    .eq("id", auth.caller.id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, notifyAll });
-}
+  if (error) return apiError("Failed to update preference", 500);
+
+  return NextResponse.json({ ok: true, notifyAll: parsed.data.notifyAll });
+});
