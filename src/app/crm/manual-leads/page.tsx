@@ -37,6 +37,7 @@ import {
   Check,
   X,
   FolderInput,
+  Clipboard,
 } from "lucide-react";
 import { useCRM } from "@/context/CRMContext";
 import { useAuth } from "@/context/AuthContext";
@@ -48,6 +49,7 @@ import { STATUS_LABELS } from "@/lib/constants";
 import type { LeadStatus, UploadBatch } from "@/types";
 import { toast } from "sonner";
 import { ManualLeadModal } from "@/components/crm/ManualLeadModal";
+import { JsonImportModal } from "@/components/crm/JsonImportModal";
 
 const ITEMS_PER_PAGE = 50;
 
@@ -340,6 +342,7 @@ export default function ManualLeadsPage() {
   // Navigation
   const [selectedBatch, setSelectedBatch] = useState<UploadBatch | "unfiled" | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isJsonImportOpen, setIsJsonImportOpen] = useState(false);
 
   // Selection
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
@@ -571,12 +574,21 @@ export default function ManualLeadsPage() {
             </div>
           </div>
           {selectedBatch !== "unfiled" && (
-            <Button
-              onClick={() => setIsModalOpen(true)}
-              className="gap-2 rounded-xl shadow-sm h-10 px-5 font-bold bg-gray-900 dark:bg-[#f5f5f7] hover:bg-black dark:hover:bg-white text-white dark:text-[#0c0c0d]"
-            >
-              <Plus className="h-4 w-4" /> Add Lead
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsJsonImportOpen(true)}
+                className="gap-2 rounded-xl shadow-sm h-10 px-4 font-semibold border-gray-200 dark:border-[#363638] text-gray-700 dark:text-[#d1d1d3] dark:bg-[#161618]"
+              >
+                <Clipboard className="h-4 w-4 text-gray-500 dark:text-[#a1a1a3]" /> Paste JSON
+              </Button>
+              <Button
+                onClick={() => setIsModalOpen(true)}
+                className="gap-2 rounded-xl shadow-sm h-10 px-5 font-bold bg-gray-900 dark:bg-[#f5f5f7] hover:bg-black dark:hover:bg-white text-white dark:text-[#0c0c0d]"
+              >
+                <Plus className="h-4 w-4" /> Add Lead
+              </Button>
+            </div>
           )}
         </div>
 
@@ -820,6 +832,15 @@ export default function ManualLeadsPage() {
           onClose={() => setIsModalOpen(false)}
           batchId={currentBatchId}
         />
+
+        {currentBatchId && (
+          <JsonImportModal
+            open={isJsonImportOpen}
+            onClose={() => setIsJsonImportOpen(false)}
+            batchId={currentBatchId}
+            folderName={folderName}
+          />
+        )}
 
         <MoveFolderDialog
           open={movingLeadId !== null}
