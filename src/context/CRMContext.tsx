@@ -34,12 +34,14 @@ interface CRMContextType {
   updateLeadBatch: (leadId: string, batchId: string | null) => Promise<void>;
   createPaymentsForClient: (leadId: string, projectValue: number) => Promise<void>;
   markPaymentPaid: (paymentId: string, data: { paidDate: string; method: PaymentMethod; reference?: string; notes?: string }) => Promise<void>;
+  markPaymentUnpaid: (paymentId: string) => Promise<void>;
   updatePaymentDueDate: (paymentId: string, dueDate: string | null) => Promise<void>;
   setProjectValue: (leadId: string, value: number) => Promise<void>;
+  addPaymentExtras: (paymentId: string, extraAmount: number, newProjectValue: number) => Promise<void>;
   addDirectClient: (data: { businessName: string; phone: string; email?: string; website?: string; services?: string; notes?: string; projectStatus?: string; projectValue?: number; becameClientAt?: string; projectStartedAt?: string; projectDeliveredAt?: string }) => Promise<void>;
   convertToClient: (leadIds: string[], services: string, notes?: string, projectValue?: number) => Promise<void>;
   revertToLead: (leadIds: string[]) => Promise<void>;
-  updateClientInfo: (leadId: string, data: { services?: string; notes?: string; projectStatus?: string; website?: string; becameClientAt?: string; projectStartedAt?: string; projectDeliveredAt?: string }) => Promise<void>;
+  updateClientInfo: (leadId: string, data: { businessName?: string; phone?: string; services?: string; notes?: string; projectStatus?: string; website?: string; becameClientAt?: string; projectStartedAt?: string; projectDeliveredAt?: string }) => Promise<void>;
   bulkUpdateStatus: (leadIds: string[], status: LeadStatus) => Promise<void>;
   bulkAssign: (leadIds: string[], assigneeName: string) => Promise<void>;
   bulkArchive: (leadIds: string[]) => Promise<void>;
@@ -176,6 +178,31 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Re-map UUID→name in already-loaded records when teamMembers arrives after loadData.
+  // On page refresh, loadData runs before fetchTeamMembers completes, so all assignee/
+  // uploadedBy names appear as "Unknown". This effect patches them without a DB round-trip.
+  useEffect(() => {
+    if (teamMembers.length === 0) return;
+    const namesMap = idToNameMap;
+    setLeads(prev => prev.map(l => ({
+      ...l,
+      assignedToName: l.assignedTo ? namesMap.get(l.assignedTo) || "Unknown" : "Unassigned",
+      uploadedByName: l.uploadedBy ? namesMap.get(l.uploadedBy) || undefined : undefined,
+    })));
+    setActivities(prev => prev.map(a => ({
+      ...a,
+      user: a.userId ? namesMap.get(a.userId) || "Unknown" : "System",
+    })));
+    setBatches(prev => prev.map(b => ({
+      ...b,
+      uploadedByName: b.uploadedBy ? namesMap.get(b.uploadedBy) || "Unknown" : "Unknown",
+    })));
+    setManualBatches(prev => prev.map(b => ({
+      ...b,
+      uploadedByName: b.uploadedBy ? namesMap.get(b.uploadedBy) || "Unknown" : "Unknown",
+    })));
+  }, [teamMembers, idToNameMap]);
 
 
   // Database Write Helpers
@@ -370,11 +397,15 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
   const deleteLead = useCallback(async (leadId: string) => {
     try {
       setLeads(prev => prev.filter(l => l.id !== leadId));
-      
-      // We need to delete activities first due to FK constraints
-      await supabase.from("activities").delete().eq("lead_id", leadId);
+      setPayments(prev => prev.filter(p => p.leadId !== leadId));
+
+      // Delete activities + payments in parallel before the lead (FK order)
+      await Promise.all([
+        supabase.from("activities").delete().eq("lead_id", leadId),
+        supabase.from("payments").delete().eq("lead_id", leadId),
+      ]);
       const { error } = await supabase.from("leads").delete().eq("id", leadId);
-      
+
       if (error) throw error;
       addLog("Deleted Lead Permanently", "lead", leadId);
     } catch (e) {
@@ -618,6 +649,9 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
   // ── Payments ────────────────────────────────────────────────────
   const createPaymentsForClient = useCallback(async (leadId: string, projectValue: number): Promise<void> => {
     if (!projectValue || projectValue <= 0) return;
+    // Guard: never create duplicate payment rows for the same lead
+    const existing = payments.filter(p => p.leadId === leadId);
+    if (existing.length > 0) return;
     const half = Math.round(projectValue / 2);
     const rows = [
       { lead_id: leadId, type: "upfront", amount: half, status: "pending" },
@@ -626,7 +660,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     const { data, error } = await supabase.from("payments").insert(rows).select();
     if (error) { console.error("Create payments error:", error); return; }
     if (data) setPayments(prev => [...prev, ...(data as PaymentRow[]).map(mapPaymentRow)]);
-  }, []);
+  }, [payments]);
 
   const markPaymentPaid = useCallback(async (paymentId: string, data: { paidDate: string; method: PaymentMethod; reference?: string; notes?: string }): Promise<void> => {
     try {
@@ -650,6 +684,28 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loadData, addLog]);
 
+  const markPaymentUnpaid = useCallback(async (paymentId: string): Promise<void> => {
+    try {
+      setPayments(prev => prev.map(p => p.id === paymentId
+        ? { ...p, status: "pending", paidDate: undefined, paymentMethod: undefined, reference: undefined, notes: undefined }
+        : p));
+      const { error } = await supabase.from("payments").update({
+        status: "pending",
+        paid_date: null,
+        payment_method: null,
+        reference: null,
+        notes: null,
+      }).eq("id", paymentId);
+      if (error) throw error;
+      addLog("Payment Marked Unpaid", "payment", paymentId);
+      toast.success("Payment marked as unpaid");
+    } catch (e: any) {
+      console.error("Mark payment unpaid error:", e);
+      toast.error("Failed to update payment");
+      loadData();
+    }
+  }, [loadData, addLog]);
+
   const updatePaymentDueDate = useCallback(async (paymentId: string, dueDate: string | null): Promise<void> => {
     try {
       setPayments(prev => prev.map(p => p.id === paymentId ? { ...p, dueDate: dueDate ?? undefined } : p));
@@ -662,27 +718,72 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loadData]);
 
-  const setProjectValue = useCallback(async (leadId: string, value: number): Promise<void> => {
+  const setProjectValue = useCallback(async (leadId: string, value: number, addonName?: string): Promise<void> => {
     try {
       setLeads(prev => prev.map(l => l.id === leadId ? { ...l, projectValue: value } : l));
-      const { error } = await supabase.from("leads").update({ project_value: value }).eq("id", leadId);
-      if (error) throw error;
-      // Update existing payment amounts to reflect the new project value (50/50 split)
-      const half = Math.round(value / 2);
-      setPayments(prev => {
-        const clientPayments = prev.filter(p => p.leadId === leadId);
-        if (clientPayments.length === 0) return prev;
-        const upfront = clientPayments.find(p => p.type === "upfront");
-        const final   = clientPayments.find(p => p.type === "final");
-        if (upfront) supabase.from("payments").update({ amount: half }).eq("id", upfront.id).then(() => {});
-        if (final)   supabase.from("payments").update({ amount: value - half }).eq("id", final.id).then(() => {});
-        return prev.map(p => {
-          if (p.leadId !== leadId) return p;
-          if (p.type === "upfront") return { ...p, amount: half };
-          if (p.type === "final")   return { ...p, amount: value - half };
-          return p;
-        });
-      });
+      const { error: leadErr } = await supabase.from("leads").update({ project_value: value }).eq("id", leadId);
+      if (leadErr) throw leadErr;
+
+      // Recalculate payment amounts — freeze paid payments.
+      const clientPayments = payments.filter(p => p.leadId === leadId);
+      if (clientPayments.length > 0) {
+        const paidPayments = clientPayments.filter(p => p.status === "paid");
+        const pendingPayments = clientPayments.filter(p => p.status === "pending");
+        const totalPaid = paidPayments.reduce((sum, p) => sum + p.amount, 0);
+
+        if (pendingPayments.length === 0) {
+          // All existing payments are paid. The only safe way to increase budget is to append a new 'addon' payment.
+          const diff = value - totalPaid;
+          if (diff > 0) {
+            const { data, error: insertErr } = await supabase.from("payments").insert({
+              lead_id: leadId,
+              type: "addon",
+              amount: diff,
+              status: "pending",
+              notes: addonName || "Add-on Payment"
+            }).select().single();
+            if (insertErr) throw insertErr;
+            setPayments(prev => [...prev, mapPaymentRow(data)]);
+          }
+        } else {
+          // We have pending payments to absorb the change.
+          const upfront = clientPayments.find(p => p.type === "upfront");
+          const final   = clientPayments.find(p => p.type === "final");
+          
+          const dbUpdates: Promise<{ error: any }>[] = [];
+          const nextAmounts = new Map<string, number>();
+
+          if (upfront && final && upfront.status === "pending" && final.status === "pending" && clientPayments.length === 2) {
+            // Clean 50/50 split if nothing is paid yet
+            const nextUpfront = Math.round(value / 2);
+            const nextFinal   = value - nextUpfront;
+            if (nextUpfront !== upfront.amount) { dbUpdates.push(supabase.from("payments").update({ amount: nextUpfront }).eq("id", upfront.id)); nextAmounts.set(upfront.id, nextUpfront); }
+            if (nextFinal !== final.amount) { dbUpdates.push(supabase.from("payments").update({ amount: nextFinal }).eq("id", final.id)); nextAmounts.set(final.id, nextFinal); }
+          } else {
+            // One or more payments are paid, or we have addons.
+            // Freeze paid payments, and dump the remaining balance into the LAST pending payment.
+            const targetPayment = (final && final.status === "pending") ? final : pendingPayments[pendingPayments.length - 1];
+            const lockedTotal = clientPayments.reduce((sum, p) => p.id === targetPayment.id ? sum : sum + p.amount, 0);
+            const nextTargetAmount = Math.max(0, value - lockedTotal);
+
+            if (nextTargetAmount !== targetPayment.amount) {
+              dbUpdates.push(supabase.from("payments").update({ amount: nextTargetAmount }).eq("id", targetPayment.id));
+              nextAmounts.set(targetPayment.id, nextTargetAmount);
+            }
+          }
+
+          if (dbUpdates.length > 0) {
+            const results = await Promise.all(dbUpdates);
+            for (const res of results) if (res.error) throw res.error;
+            
+            setPayments(prev => prev.map(p => {
+              if (nextAmounts.has(p.id)) return { ...p, amount: nextAmounts.get(p.id)! };
+              return p;
+            }));
+          }
+        }
+      }
+
       addLog("Set Project Value", "lead", leadId, undefined, { value });
       toast.success("Project value updated");
     } catch (e: any) {
@@ -690,7 +791,42 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
       toast.error("Failed to set project value");
       loadData();
     }
-  }, [loadData, addLog]);
+  }, [payments, loadData, addLog]);
+
+  // Absorbs additional charges (scope additions) into both the client's project
+  // value and the specific payment that will collect them. Used when extras
+  // are added at invoice-generation time, so the underlying accounting stays
+  // consistent with the invoice PDF.
+  const addPaymentExtras = useCallback(async (paymentId: string, extraAmount: number, newProjectValue: number): Promise<void> => {
+    if (extraAmount <= 0) return;
+    const payment = payments.find(p => p.id === paymentId);
+    if (!payment) {
+      console.error("addPaymentExtras: payment not found", paymentId);
+      return;
+    }
+    const newPaymentAmount = payment.amount + extraAmount;
+    try {
+      setPayments(prev => prev.map(p => p.id === paymentId ? { ...p, amount: newPaymentAmount } : p));
+      setLeads(prev => prev.map(l => l.id === payment.leadId ? { ...l, projectValue: newProjectValue } : l));
+
+      const [payRes, leadRes] = await Promise.all([
+        supabase.from("payments").update({ amount: newPaymentAmount }).eq("id", paymentId),
+        supabase.from("leads").update({ project_value: newProjectValue }).eq("id", payment.leadId),
+      ]);
+      if (payRes.error) throw payRes.error;
+      if (leadRes.error) throw leadRes.error;
+
+      addLog("Added Scope Extras", "payment", paymentId, undefined, {
+        extra_amount: extraAmount,
+        new_payment_amount: newPaymentAmount,
+        new_project_value: newProjectValue,
+      });
+    } catch (e: any) {
+      console.error("addPaymentExtras error:", e);
+      toast.error("Failed to record extras");
+      loadData();
+    }
+  }, [payments, loadData, addLog]);
 
   // ── Client conversion + bulk actions ────────────────────────────
   const convertToClient = useCallback(async (leadIds: string[], services: string, notes?: string, projectValue?: number) => {
@@ -711,7 +847,8 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
       const { error } = await supabase.from("leads").update(dbUpdates).in("id", leadIds);
       if (error) throw error;
       if (projectValue && projectValue > 0) {
-        for (const id of leadIds) await createPaymentsForClient(id, projectValue);
+        // Parallel payment creation — one set per converted lead
+        await Promise.all(leadIds.map(id => createPaymentsForClient(id, projectValue)));
       }
       addLog(`Converted ${leadIds.length} lead(s) to client`, "lead", leadIds[0], undefined, { count: leadIds.length, services });
       toast.success(`${leadIds.length} lead${leadIds.length > 1 ? "s" : ""} converted to client${leadIds.length > 1 ? "s" : ""}`);
@@ -729,11 +866,18 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
       setLeads(prev => prev.map(l => leadIds.includes(l.id)
         ? { ...l, isClient: false, becameClientAt: undefined }
         : l));
+      // Remove orphaned payment rows immediately from local state
+      setPayments(prev => prev.filter(p => !leadIds.includes(p.leadId)));
+
       const { error } = await supabase
         .from("leads")
         .update({ is_client: false, became_client_at: null, updated_at: new Date().toISOString() } as Record<string, unknown>)
         .in("id", leadIds);
       if (error) throw error;
+
+      // Delete associated payment rows so they don't ghost if the lead is re-converted
+      await supabase.from("payments").delete().in("lead_id", leadIds);
+
       addLog(`Moved ${leadIds.length} client(s) back to leads`, "lead", leadIds[0], undefined, { count: leadIds.length });
       toast.success(`Moved ${leadIds.length} back to leads`);
     } catch (e) {
@@ -787,17 +931,41 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user?.id, idToNameMap, addLog, createPaymentsForClient]);
 
-  const updateClientInfo = useCallback(async (leadId: string, data: { services?: string; notes?: string; projectStatus?: string; website?: string; becameClientAt?: string; projectStartedAt?: string; projectDeliveredAt?: string }) => {
+  const updateClientInfo = useCallback(async (leadId: string, data: { businessName?: string; phone?: string; services?: string; notes?: string; projectStatus?: string; website?: string; becameClientAt?: string; projectStartedAt?: string; projectDeliveredAt?: string }) => {
     try {
+      // Auto-set delivered date when status switches to "delivered" without an explicit date
+      const autoDeliveredAt = data.projectDeliveredAt !== undefined
+        ? data.projectDeliveredAt
+        : data.projectStatus === "delivered"
+          ? new Date().toISOString()
+          : undefined;
+
       setLeads(prev => prev.map(l => l.id === leadId
-        ? { ...l, clientServices: data.services ?? l.clientServices, clientNotes: data.notes ?? l.clientNotes, projectStatus: data.projectStatus ?? l.projectStatus, website: data.website ?? l.website, becameClientAt: data.becameClientAt ?? l.becameClientAt, projectStartedAt: data.projectStartedAt ?? l.projectStartedAt, projectDeliveredAt: data.projectDeliveredAt ?? l.projectDeliveredAt }
+        ? {
+            ...l,
+            businessName:      data.businessName      ?? l.businessName,
+            phone:             data.phone             ?? l.phone,
+            clientServices:    data.services          ?? l.clientServices,
+            clientNotes:       data.notes             ?? l.clientNotes,
+            projectStatus:     data.projectStatus     ?? l.projectStatus,
+            website:           data.website           ?? l.website,
+            becameClientAt:    data.becameClientAt    ?? l.becameClientAt,
+            projectStartedAt:  data.projectStartedAt  ?? l.projectStartedAt,
+            projectDeliveredAt: autoDeliveredAt       ?? l.projectDeliveredAt,
+          }
         : l));
+
       const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      if (data.services !== undefined) updates.client_services = data.services || null;
-      if (data.notes !== undefined) updates.client_notes = data.notes || null;
-      if (data.projectStatus !== undefined) updates.project_status = data.projectStatus || null;
-      if (data.website !== undefined) updates.website = data.website || null;
-      if (data.becameClientAt !== undefined) updates.became_client_at = data.becameClientAt || null;
+      if (data.businessName !== undefined)  updates.business_name      = data.businessName || null;
+      if (data.phone !== undefined)         updates.phone              = data.phone || null;
+      if (data.services !== undefined)      updates.client_services    = data.services || null;
+      if (data.notes !== undefined)         updates.client_notes       = data.notes || null;
+      if (data.projectStatus !== undefined) updates.project_status     = data.projectStatus || null;
+      if (data.website !== undefined)       updates.website            = data.website || null;
+      if (data.becameClientAt !== undefined)   updates.became_client_at   = data.becameClientAt || null;
+      if (data.projectStartedAt !== undefined) updates.project_started_at = data.projectStartedAt || null;
+      if (autoDeliveredAt !== undefined)    updates.project_delivered_at = autoDeliveredAt || null;
+
       const { error } = await supabase.from("leads").update(updates).eq("id", leadId);
       if (error) throw error;
       toast.success("Client info updated");
@@ -865,7 +1033,13 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     if (leadIds.length === 0) return;
     try {
       setLeads(prev => prev.filter(l => !leadIds.includes(l.id)));
-      await supabase.from("activities").delete().in("lead_id", leadIds);
+      setPayments(prev => prev.filter(p => !leadIds.includes(p.leadId)));
+
+      // Delete activities + payments in parallel before leads (FK order)
+      await Promise.all([
+        supabase.from("activities").delete().in("lead_id", leadIds),
+        supabase.from("payments").delete().in("lead_id", leadIds),
+      ]);
       const { error } = await supabase.from("leads").delete().in("id", leadIds);
       if (error) throw error;
       addLog(`Deleted ${leadIds.length} lead(s)`, "lead", leadIds[0], undefined, { count: leadIds.length });
@@ -906,8 +1080,10 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         updateLeadBatch,
         createPaymentsForClient,
         markPaymentPaid,
+        markPaymentUnpaid,
         updatePaymentDueDate,
         setProjectValue,
+        addPaymentExtras,
         addDirectClient,
         convertToClient,
         revertToLead,

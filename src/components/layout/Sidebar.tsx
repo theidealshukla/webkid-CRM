@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -22,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 
 const navItems = [
-  { name: "View Website", path: "https://webkid-ai.netlify.app/", icon: ExternalLink, external: true },
+  { name: "View Website", path: "https://webkid.me", icon: ExternalLink, external: true },
   { name: "Dashboard", path: "/crm", icon: LayoutDashboard },
   { name: "Leads", path: "/crm/leads", icon: Users },
   { name: "Our Clients", path: "/crm/clients", icon: Briefcase },
@@ -89,7 +90,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        
+
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
         setLocalAvatar(dataUrl);
         if (user?.id) {
@@ -123,7 +124,14 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
       <div className="flex items-center justify-between h-16 px-5 border-b border-gray-100 dark:border-[#2c2c2e] bg-white dark:bg-[#161618]">
         <div className="flex items-center w-full min-w-0 justify-center pr-2">
           <div className={`flex items-center justify-center transition-all duration-300 overflow-visible ${(!collapsed || mobileOpen) ? "h-10 w-40" : "h-10 w-full"}`}>
-            <img src="/webkid.svg" alt="Webkid Logo" className={`w-full h-full object-contain drop-shadow-sm ${(!collapsed || mobileOpen) ? "scale-[1.8]" : "scale-[2.5]"}`} />
+            <Image
+              src="/webkid.svg"
+              alt="Webkid Logo"
+              width={160}
+              height={40}
+              className={`w-full h-full object-contain drop-shadow-sm ${(!collapsed || mobileOpen) ? "scale-[1.8]" : "scale-[2.5]"}`}
+              priority={false}
+            />
           </div>
         </div>
         {/* Mobile close button */}
@@ -199,15 +207,15 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
               className="h-10 w-10 rounded-full bg-white dark:bg-[#2c2c2e] shadow-sm border border-gray-200 dark:border-[#3a3a3c] flex items-center justify-center flex-shrink-0 cursor-pointer overflow-hidden relative transition-colors hover:border-indigo-400 group/avatar"
               title="Click to upload avatar"
             >
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                accept="image/*" 
-                onChange={handleFileChange} 
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleFileChange}
               />
               {localAvatar ? (
-                <img src={localAvatar} alt={user.name} className="h-full w-full object-cover" />
+                <Image src={localAvatar} alt={user.name} width={40} height={40} className="h-full w-full object-cover" unoptimized />
               ) : (
                 <span className="text-gray-700 dark:text-[#ebebed] text-xs font-bold">{initials}</span>
               )}

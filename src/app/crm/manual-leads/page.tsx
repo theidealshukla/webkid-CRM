@@ -433,7 +433,7 @@ export default function ManualLeadsPage() {
   const debouncedSearch = useDebounce(searchTerm, 300);
 
   const allManualLeads = useMemo(
-    () => leads.filter((l) => !l.isArchived && l.source === "manual"),
+    () => leads.filter((l) => !l.isArchived && !l.isClient && l.source === "manual"),
     [leads]
   );
 

@@ -21,11 +21,13 @@ function formatINR(amount: number) {
 
 interface Props {
   payment: Payment | null;
+  /** Total project value used to compute the real payment percentage. If omitted, percentage is not shown. */
+  totalProjectValue?: number;
   onClose: () => void;
   onConfirm: (paymentId: string, data: { paidDate: string; method: PaymentMethod; reference?: string; notes?: string }) => Promise<void>;
 }
 
-export function MarkPaymentModal({ payment, onClose, onConfirm }: Props) {
+export function MarkPaymentModal({ payment, totalProjectValue, onClose, onConfirm }: Props) {
   const [paidDate, setPaidDate] = useState(new Date().toISOString().split("T")[0]);
   const [method, setMethod] = useState<PaymentMethod>("upi");
   const [reference, setReference] = useState("");
@@ -54,7 +56,13 @@ export function MarkPaymentModal({ payment, onClose, onConfirm }: Props) {
 
   if (!payment) return null;
 
-  const label = payment.type === "upfront" ? "Upfront Payment (50%)" : "Final Payment (50%)";
+  const pct = totalProjectValue && totalProjectValue > 0
+    ? `${Math.round((payment.amount / totalProjectValue) * 100)}%`
+    : null;
+  const label = payment.type === "upfront" ? `Upfront Payment${pct ? ` (${pct})` : ""}`
+    : payment.type === "final" ? `Final Payment${pct ? ` (${pct})` : ""}`
+    : `${payment.notes || "Add-on Payment"}${pct ? ` (${pct})` : ""}`;
+
 
   return (
     <Dialog open={!!payment} onOpenChange={(o) => !o && onClose()}>
@@ -102,15 +110,32 @@ export function MarkPaymentModal({ payment, onClose, onConfirm }: Props) {
 
           <div className="space-y-1.5">
             <Label htmlFor="mp-ref">
-              Reference / Transaction ID{" "}
-              <span className="text-gray-400 font-normal">(optional)</span>
+              UTR / Transaction ID{" "}
+              {(method === "upi" || method === "bank")
+                ? <span className="text-amber-500 font-normal text-xs">(required for invoice)</span>
+                : <span className="text-gray-400 font-normal">(optional)</span>
+              }
             </Label>
             <Input
               id="mp-ref"
-              placeholder="UPI ref, transaction ID..."
+              placeholder={
+                method === "upi"  ? "UPI transaction ID / ref number" :
+                method === "bank" ? "UTR number (12 digits)" :
+                "Reference number"
+              }
               value={reference}
               onChange={(e) => setReference(e.target.value)}
+              className={
+                (method === "upi" || method === "bank") && !reference
+                  ? "border-amber-300 focus-visible:ring-amber-400"
+                  : ""
+              }
             />
+            {(method === "upi" || method === "bank") && !reference && (
+              <p className="text-xs text-amber-500">
+                Add the transaction ID so it appears on the invoice PDF.
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">

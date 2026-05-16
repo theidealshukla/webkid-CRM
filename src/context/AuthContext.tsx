@@ -16,32 +16,29 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Simple sleep helper for retry delays
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [teamMembers, setTeamMembers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const isMounted = useRef(true);
 
-  // Fetch the public.users profile for a given auth user id with timeout protection
+  // Fetch the public.users profile for a given auth user id.
+  // Returns null on any DB error — callers must handle null without guessing the role.
+  // The old "member fallback" was removed: assigning role:"member" on a DB timeout
+  // silently downgrades an admin every time Supabase has a slow cold start.
   const fetchUserProfile = useCallback(async (authUser: any | string): Promise<User | null> => {
-    // Support both string IDs (legacy) and full user objects (for fallback generation)
     const id = typeof authUser === "string" ? authUser : authUser?.id;
-    const email = typeof authUser === "string" ? "" : authUser?.email;
-    const name = typeof authUser === "string" ? "Admin" : (authUser?.user_metadata?.name || authUser?.email?.split("@")[0] || "Admin");
+    if (!id) return null;
 
     try {
-      const queryPromise = supabase
+      const { data, error } = await supabase
         .from("users")
         .select("*")
         .eq("id", id)
         .single();
-        
-      let timer: NodeJS.Timeout;
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("fetchUserProfile timeout")), 5000);
-      });
-
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise]).finally(() => clearTimeout(timer)) as any;
 
       if (error || !data) {
         throw new Error("Profile fetch issue: " + (error?.message || "No data"));
@@ -55,36 +52,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     } catch (e) {
       console.error("fetchUserProfile error:", e);
-      
-      // HARD FALLBACK: keep the UI alive on transient DB failures, but DO NOT grant admin.
-      // Granting admin on a network failure is a privilege-escalation footgun.
-      if (email && id) {
-        console.warn("Using offline fallback profile (member role) to prevent UI freeze.");
-        return {
-          id: id,
-          email: email,
-          name: name,
-          role: "member",
-        };
-      }
       return null;
     }
   }, []);
 
-  // Fetch all team members with timeout protection
+  // Fetch profile with one automatic retry (handles Supabase cold-start latency).
+  // Does NOT fall back to a guessed role — returns null if both attempts fail.
+  const fetchUserProfileWithRetry = useCallback(async (authUser: any | string): Promise<User | null> => {
+    let profile = await fetchUserProfile(authUser);
+    if (!profile) {
+      await sleep(2000); // brief pause before retry
+      profile = await fetchUserProfile(authUser);
+    }
+    return profile;
+  }, [fetchUserProfile]);
+
+  // Fetch all team members
   const fetchTeamMembers = useCallback(async () => {
     try {
-      const queryPromise = supabase
+      const { data, error } = await supabase
         .from("users")
         .select("*")
         .order("name");
-        
-      let timer: NodeJS.Timeout;
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("fetchTeamMembers timeout")), 5000);
-      });
-
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise]).finally(() => clearTimeout(timer)) as any;
 
       if (!error && data && isMounted.current) {
         setTeamMembers(
@@ -114,17 +103,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!isMounted.current) return;
           console.log(`Auth event: ${event}`);
 
-          if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
+          if (event === "TOKEN_REFRESHED") {
+            // JWT was silently renewed — the user's role/profile hasn't changed.
+            // Skip re-fetching: a DB timeout here would cause a role downgrade.
+            hasResolved = true;
+            if (isMounted.current) setIsLoading(false);
+          } else if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
             hasResolved = true;
             if (session?.user) {
-              const profile = await fetchUserProfile(session.user);
+              const profile = await fetchUserProfileWithRetry(session.user);
               if (profile && isMounted.current) {
                 setUser(profile);
-                fetchTeamMembers(); // Do not await this, let it load in background
-              } else if (isMounted.current && event !== "INITIAL_SESSION") {
-                // Only clear if definitively signed in but no profile exists
+                fetchTeamMembers(); // background, no await
+              } else if (isMounted.current && event === "SIGNED_IN") {
+                // Active login but profile unreachable even after retry
                 setUser(null);
               }
+              // For INITIAL_SESSION: if profile is still null, keep whatever user state
+              // exists (e.g. from a previous successful load) rather than clearing it.
             } else if (isMounted.current) {
               setUser(null);
             }
@@ -144,35 +140,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Failed to set up auth listener:", e);
     }
 
-    // 2. Fetch initial session as a fallback guaranteed startup
+    // 2. Fetch initial session as a guaranteed startup fallback
     const initSession = async () => {
       try {
-        const sessionPromise = supabase.auth.getSession();
-        let timer: NodeJS.Timeout;
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Error("getSession timeout")), 5000);
-        });
-        
-        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]).finally(() => clearTimeout(timer)) as any;
-        
-        if (error) {
-           console.warn("getSession error:", error.message);
-        }
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) console.warn("getSession error:", error.message);
 
         if (!hasResolved && isMounted.current) {
           hasResolved = true;
           if (session?.user) {
-            const profile = await fetchUserProfile(session.user);
+            const profile = await fetchUserProfileWithRetry(session.user);
             if (profile && isMounted.current) {
               setUser(profile);
-              fetchTeamMembers(); // Do not await this, let it load in background
+              fetchTeamMembers();
             } else if (isMounted.current) {
               setUser(null);
             }
           } else {
-            setUser(null);
+            if (isMounted.current) setUser(null);
           }
-          setIsLoading(false);
+          if (isMounted.current) setIsLoading(false);
         }
       } catch (e) {
         console.error("Auth init exception:", e);
@@ -190,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isMounted.current = false;
       subscription?.unsubscribe();
     };
-  }, [fetchUserProfile, fetchTeamMembers]);
+  }, [fetchUserProfileWithRetry, fetchTeamMembers]);
 
   const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -207,8 +194,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: "Login failed. Please try again." };
       }
 
-      let profile = await fetchUserProfile(data.user);
-      
+      let profile = await fetchUserProfileWithRetry(data.user);
+
       // Auto-heal missing or disconnected profiles
       if (!profile) {
         const { data: profileByEmail } = await supabase
@@ -235,7 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: newId,
             email: profileByEmail.email,
             name: profileByEmail.name || email.split("@")[0],
-            role: profileByEmail.role || "member", // default to member; grant admin explicitly
+            role: profileByEmail.role || "member",
           }]);
         } else {
           // No profile at all, create a brand new one
@@ -243,12 +230,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: data.user.id,
             email: email,
             name: email.split("@")[0],
-            role: "member", // default to member; admin must be granted by another admin
+            role: "member", // default to member; admin must be granted explicitly
           }]);
         }
-        
+
         // Fetch again after self-healing
-        profile = await fetchUserProfile(data.user);
+        profile = await fetchUserProfileWithRetry(data.user);
       }
 
       if (profile) {
@@ -256,13 +243,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await fetchTeamMembers();
         return { success: true };
       }
-      
+
       return { success: false, error: "Failed to sync user profile. Please contact support." };
     } catch (e: any) {
       console.error("Login error:", e);
       return { success: false, error: e.message || "An unexpected error occurred." };
     }
-  }, [fetchUserProfile, fetchTeamMembers]);
+  }, [fetchUserProfileWithRetry, fetchTeamMembers]);
 
   const signup = useCallback(async (email: string, password: string, name: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -293,7 +280,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Existing profile found with a different UUID — migrate all FK references
         const oldId = existingUser.id;
 
-        // Update all foreign key references from old UUID to new auth UUID
         await Promise.all([
           supabase.from("leads").update({ assigned_to: newAuthId }).eq("assigned_to", oldId),
           supabase.from("leads").update({ uploaded_by: newAuthId }).eq("uploaded_by", oldId),
@@ -302,7 +288,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           supabase.from("upload_batches").update({ uploaded_by: newAuthId }).eq("uploaded_by", oldId),
         ]);
 
-        // Now update the users row itself (delete old, insert new to avoid PK conflict)
         await supabase.from("users").delete().eq("id", oldId);
         await supabase.from("users").insert([{
           id: newAuthId,
@@ -328,10 +313,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { success: false, error: "Failed to create user profile. Please try again." };
         }
       }
-      // else: existingUser.id === newAuthId — profile already linked correctly, nothing to do
+      // else: existingUser.id === newAuthId — profile already linked correctly
 
       // 3. Fetch the profile
-      const profile = await fetchUserProfile({ id: newAuthId, email, user_metadata: { name } });
+      const profile = await fetchUserProfileWithRetry({ id: newAuthId, email, user_metadata: { name } });
       if (profile) {
         setUser(profile);
         await fetchTeamMembers();
@@ -343,7 +328,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Signup error:", e);
       return { success: false, error: e.message || "An unexpected error occurred." };
     }
-  }, [fetchUserProfile, fetchTeamMembers]);
+  }, [fetchUserProfileWithRetry, fetchTeamMembers]);
 
   const logout = useCallback(async () => {
     try {

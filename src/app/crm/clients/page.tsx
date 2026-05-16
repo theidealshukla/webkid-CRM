@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AddClientModal, type ProjectStatus } from "@/components/crm/AddClientModal";
 import { MarkPaymentModal } from "@/components/crm/MarkPaymentModal";
-import type { Payment } from "@/types";
+import { GenerateInvoiceModal } from "@/components/crm/GenerateInvoiceModal";
+import type { Lead, Payment } from "@/types";
 import {
   Briefcase, Search, MoreHorizontal, Pencil, RotateCcw, Phone, Mail,
   Calendar, Globe, Plus, FileText, IndianRupee, CheckCircle2, Clock,
@@ -61,13 +62,36 @@ const EMPTY_EDIT: EditState = {
   becameClientAt: "", projectStartedAt: "", projectDeliveredAt: "",
 };
 
-function PaymentBadge({ payment, onMark }: { payment: Payment; onMark: (p: Payment) => void }) {
-  const label = payment.type === "upfront" ? "Upfront" : "Final";
+function PaymentBadge({ payment, onMark, onUnmark, onInvoice }: {
+  payment: Payment;
+  onMark: (p: Payment) => void;
+  onUnmark: (p: Payment) => void;
+  onInvoice: (p: Payment) => void;
+}) {
+  const label = payment.type === "upfront" ? "Upfront" : payment.type === "final" ? "Final" : (payment.notes || "Add-on");
   if (payment.status === "paid") {
     return (
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-        <CheckCircle2 className="h-3.5 w-3.5" />
-        {label} paid
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          {label} paid
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onInvoice(payment)}
+            className="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 hover:border-gray-400"
+          >
+            <FileText className="h-2.5 w-2.5" />
+            Invoice
+          </button>
+          <button
+            onClick={() => onUnmark(payment)}
+            className="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 hover:border-red-300"
+            title="Mark as unpaid"
+          >
+            Undo
+          </button>
+        </div>
       </div>
     );
   }
@@ -96,7 +120,7 @@ function PaymentBadge({ payment, onMark }: { payment: Payment; onMark: (p: Payme
 export default function ClientsPage() {
   const {
     leads, payments, addDirectClient, revertToLead, updateClientInfo,
-    createPaymentsForClient, markPaymentPaid, setProjectValue, isLoadingData,
+    createPaymentsForClient, markPaymentPaid, markPaymentUnpaid, setProjectValue, isLoadingData,
   } = useCRM();
 
   const clients = useMemo(() => leads.filter(l => l.isClient && !l.isArchived), [leads]);
@@ -105,10 +129,25 @@ export default function ClientsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<EditState>(EMPTY_EDIT);
   const [markingPayment, setMarkingPayment] = useState<Payment | null>(null);
+  const [invoiceModal, setInvoiceModal] = useState<{ payment: Payment; client: Lead } | null>(null);
   const [settingValueId, setSettingValueId] = useState<string | null>(null);
   const [valueInput, setValueInput] = useState("");
   const [editingValueId, setEditingValueId] = useState<string | null>(null);
   const [editValueInput, setEditValueInput] = useState("");
+
+  // Pre-compute a map of leadId → Payment[] to avoid O(N×M) filtering
+  // Automatically sorts payments by creation date
+  const clientPaymentsMap = useMemo(() => {
+    const map = new Map<string, Payment[]>();
+    for (const p of payments) {
+      if (!map.has(p.leadId)) map.set(p.leadId, []);
+      map.get(p.leadId)!.push(p);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    }
+    return map;
+  }, [payments]);
 
   const filtered = useMemo(() => {
     if (!search) return clients;
@@ -186,7 +225,12 @@ export default function ClientsPage() {
     if (!editingValueId) return;
     const val = parseFloat(editValueInput.replace(/,/g, ""));
     if (!val || val <= 0) return;
-    await setProjectValue(editingValueId, val);
+    const client = clients.find(c => c.id === editingValueId);
+    let addonName = undefined;
+    if (client && client.projectValue && val > client.projectValue) {
+      addonName = window.prompt(`You are increasing the project value by ₹${val - client.projectValue}.\nWhat is this extra charge for? (e.g. 'CMS Add-on')`);
+    }
+    await setProjectValue(editingValueId, val, addonName || undefined);
     setEditingValueId(null);
     setEditValueInput("");
   };
@@ -305,9 +349,7 @@ export default function ClientsPage() {
           {filtered.map((c) => {
             const services = (c.clientServices || "").split(",").map(s => s.trim()).filter(Boolean);
             const status = STATUS_CONFIG[c.projectStatus || "in_progress"] ?? STATUS_CONFIG.in_progress;
-            const clientPayments = payments.filter(p => p.leadId === c.id);
-            const upfront = clientPayments.find(p => p.type === "upfront");
-            const final = clientPayments.find(p => p.type === "final");
+            const clientPayments = clientPaymentsMap.get(c.id) || [];
             const hasPayments = clientPayments.length > 0;
             const hasProjectValue = !!c.projectValue;
             const isSettingValue = settingValueId === c.id;
@@ -402,8 +444,15 @@ export default function ClientsPage() {
                           </div>
                         )}
                         {/* Payment status rows */}
-                        {upfront && <PaymentBadge payment={upfront} onMark={setMarkingPayment} />}
-                        {final && <PaymentBadge payment={final} onMark={setMarkingPayment} />}
+                        {clientPayments.map(p => (
+                          <PaymentBadge 
+                            key={p.id} 
+                            payment={p} 
+                            onMark={setMarkingPayment} 
+                            onUnmark={(p) => { if (confirm("Mark this payment as unpaid? All payment details will be cleared.")) markPaymentUnpaid(p.id); }} 
+                            onInvoice={(p) => setInvoiceModal({ payment: p, client: c })} 
+                          />
+                        ))}
                       </div>
                     ) : isSettingValue ? (
                       <div className="space-y-2">
@@ -564,6 +613,8 @@ export default function ClientsPage() {
         }}
         onConfirm={async (data) => {
           await updateClientInfo(editing.leadId, {
+            businessName: data.businessName,
+            phone: data.phone,
             services: data.services,
             notes: data.notes,
             projectStatus: data.projectStatus,
@@ -577,11 +628,22 @@ export default function ClientsPage() {
 
       <MarkPaymentModal
         payment={markingPayment}
+        totalProjectValue={markingPayment ? clients.find(c => c.id === markingPayment.leadId)?.projectValue : undefined}
         onClose={() => setMarkingPayment(null)}
         onConfirm={async (paymentId, data) => {
           await markPaymentPaid(paymentId, data);
         }}
       />
+
+      {invoiceModal && (
+        <GenerateInvoiceModal
+          open={!!invoiceModal}
+          onClose={() => setInvoiceModal(null)}
+          client={invoiceModal.client}
+          payment={invoiceModal.payment}
+          allPayments={payments.filter(p => p.leadId === invoiceModal.client.id)}
+        />
+      )}
     </div>
   );
 }
