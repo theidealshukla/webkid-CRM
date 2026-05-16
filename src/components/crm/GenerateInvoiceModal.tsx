@@ -105,9 +105,33 @@ export function GenerateInvoiceModal({ open, onClose, client, allPayments }: Pro
 
   const defaultItems = [...baseItems, ...addonItems];
 
-  const [lineItems, setLineItems] = useState<InvoiceLineItem[]>(defaultItems);
+  const [lineItems, setLineItems] = useState<InvoiceLineItem[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(`invoice_items_${client.id}`);
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return defaultItems;
+  });
 
-  const [notes, setNotes] = useState(client.clientNotes || "");
+  const [notes, setNotes] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(`invoice_notes_${client.id}`);
+        if (saved) return saved;
+      } catch (e) {}
+    }
+    return client.clientNotes || "";
+  });
+
+  useEffect(() => {
+    if (open && typeof window !== "undefined") {
+      localStorage.setItem(`invoice_items_${client.id}`, JSON.stringify(lineItems));
+      localStorage.setItem(`invoice_notes_${client.id}`, notes);
+    }
+  }, [lineItems, notes, client.id, open]);
+
   const [generating, setGenerating] = useState(false);
 
   // Pre-fetch invoice number as soon as the modal opens
@@ -246,7 +270,20 @@ export function GenerateInvoiceModal({ open, onClose, client, allPayments }: Pro
 
           {/* ── Base line items ── */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Services / Scope</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Services / Scope</Label>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 px-2 text-[10px] text-gray-500 hover:text-gray-900 dark:hover:text-gray-100"
+                onClick={() => {
+                  setLineItems(defaultItems);
+                  setNotes(client.clientNotes || "");
+                }}
+              >
+                Reset to default
+              </Button>
+            </div>
             <div className="space-y-2">
               {lineItems.map((item, idx) => (
                 <ItemRow key={idx} item={item} idx={idx} onUpdate={updateBase} onRemove={removeBase}
