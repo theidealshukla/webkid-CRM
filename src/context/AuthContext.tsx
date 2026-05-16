@@ -34,11 +34,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!id) return null;
 
     try {
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", id)
-        .single();
+      // Bug A fix: race against a 5s timeout so a hung Supabase query never
+      // blocks isLoading from clearing (no timeout = spinner stuck forever).
+      const { data, error } = await Promise.race([
+        supabase.from("users").select("*").eq("id", id).single(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Profile fetch timed out")), 5000)
+        ),
+      ]);
 
       if (error || !data) {
         throw new Error("Profile fetch issue: " + (error?.message || "No data"));
@@ -96,6 +99,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let subscription: { unsubscribe: () => void } | null = null;
     let hasResolved = false;
 
+    // Bug B fix: absolute safety net — no matter what goes wrong in the async
+    // chain, isLoading clears after 15s so the user is never permanently stuck.
+    // 15s = 2 profile fetch attempts × 5s timeout + 2s sleep between retries + buffer.
+    const maxLoadingTimer = setTimeout(() => {
+      if (isMounted.current) {
+        console.warn("Auth: max loading time reached, forcing isLoading=false");
+        setIsLoading(false);
+      }
+    }, 15000);
+
     // 1. Listen to auth state changes immediately to catch events reliably
     try {
       const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
@@ -115,12 +128,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (profile && isMounted.current) {
                 setUser(profile);
                 fetchTeamMembers(); // background, no await
-              } else if (isMounted.current && event === "SIGNED_IN") {
-                // Active login but profile unreachable even after retry
-                setUser(null);
+              } else if (isMounted.current) {
+                // Bug C fix: profile fetch failed for an authenticated session.
+                // Use auth metadata as a minimal fallback so the user isn't locked
+                // out by a DB cold-start or transient connectivity issue.
+                // Role defaults to "member" — admin can still reload once DB recovers.
+                const fallback: User = {
+                  id: session.user.id,
+                  email: session.user.email ?? "",
+                  name: (session.user.user_metadata?.name as string | undefined)
+                    ?? session.user.email?.split("@")[0]
+                    ?? "User",
+                  role: "member",
+                };
+                console.warn("Auth: profile fetch failed, using auth metadata fallback");
+                setUser(fallback);
+                fetchTeamMembers();
               }
-              // For INITIAL_SESSION: if profile is still null, keep whatever user state
-              // exists (e.g. from a previous successful load) rather than clearing it.
             } else if (isMounted.current) {
               setUser(null);
             }
@@ -154,7 +178,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(profile);
               fetchTeamMembers();
             } else if (isMounted.current) {
-              setUser(null);
+              // Same fallback as above for the initSession path
+              const fallback: User = {
+                id: session.user.id,
+                email: session.user.email ?? "",
+                name: (session.user.user_metadata?.name as string | undefined)
+                  ?? session.user.email?.split("@")[0]
+                  ?? "User",
+                role: "member",
+              };
+              console.warn("Auth: profile fetch failed in initSession, using fallback");
+              setUser(fallback);
+              fetchTeamMembers();
             }
           } else {
             if (isMounted.current) setUser(null);
@@ -175,6 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       isMounted.current = false;
+      clearTimeout(maxLoadingTimer);
       subscription?.unsubscribe();
     };
   }, [fetchUserProfileWithRetry, fetchTeamMembers]);
