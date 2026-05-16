@@ -83,16 +83,27 @@ function ItemRow({
 export function GenerateInvoiceModal({ open, onClose, client, allPayments }: Props) {
   const { user } = useAuth();
 
+  const addonPayments = allPayments.filter(p => p.type === "addon");
+  const totalProjectValue = client.projectValue ?? allPayments.reduce((s, p) => s + p.amount, 0);
+  const addonsTotal = addonPayments.reduce((s, p) => s + p.amount, 0);
+  const baseValue = Math.max(0, totalProjectValue - addonsTotal);
+
   // ── Base line items (Master Invoice) ─────────────────────────────────────
-  // For a master invoice, the project value is usually the single main line item.
-  const defaultItems: InvoiceLineItem[] = [
+  const baseItems: InvoiceLineItem[] = [
     { 
       description: client.clientServices 
         ? `${client.businessName} — ${client.clientServices}` 
-        : `${client.businessName} — Services`, 
-      amount: client.projectValue ?? allPayments.reduce((s, p) => s + p.amount, 0)
+        : `${client.businessName} — Base Services`, 
+      amount: baseValue
     }
   ];
+
+  const addonItems: InvoiceLineItem[] = addonPayments.map(addon => ({
+    description: addon.notes || "Additional Feature / Add-on",
+    amount: addon.amount
+  }));
+
+  const defaultItems = [...baseItems, ...addonItems];
 
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>(defaultItems);
 
@@ -191,11 +202,9 @@ export function GenerateInvoiceModal({ open, onClose, client, allPayments }: Pro
     } finally {
       setGenerating(false);
     }
-  }, [lineItems, notes, client, payment, effectiveAmountRecv, effectiveProjectTotal, previouslyPaid, newBalanceDue, grandTotal, user?.id, onClose]);
+  }, [lineItems, notes, client, totalPaid, effectiveProjectTotal, newBalanceDue, baseSubtotal, user?.id, onClose]);
 
   if (!open) return null;
-
-  const paymentLabel = payment.type === "upfront" ? "Upfront (50%)" : "Final Payment";
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -206,9 +215,9 @@ export function GenerateInvoiceModal({ open, onClose, client, allPayments }: Pro
               <FileText className="h-5 w-5 text-white dark:text-gray-900" />
             </div>
             <div>
-              <DialogTitle>Generate Invoice</DialogTitle>
+              <DialogTitle>Generate Master Invoice</DialogTitle>
               <DialogDescription className="mt-0.5">
-                {client.businessName} · {paymentLabel} · {formatINR(effectiveAmountRecv)}
+                {client.businessName} · Master Invoice · {formatINR(totalPaid)}
               </DialogDescription>
             </div>
           </div>
@@ -221,13 +230,8 @@ export function GenerateInvoiceModal({ open, onClose, client, allPayments }: Pro
             <Badge variant="outline" className="text-xs">
               Project total: {formatINR(effectiveProjectTotal)}
             </Badge>
-            {previouslyPaid > 0 && (
-              <Badge variant="outline" className="text-xs text-gray-500 border-gray-200">
-                Previously paid: {formatINR(previouslyPaid)}
-              </Badge>
-            )}
             <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800">
-              This payment: {formatINR(effectiveAmountRecv)}
+              Total Paid: {formatINR(totalPaid)}
             </Badge>
             {newBalanceDue > 0 ? (
               <Badge variant="outline" className="text-xs text-amber-600 border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800">
@@ -272,16 +276,15 @@ export function GenerateInvoiceModal({ open, onClose, client, allPayments }: Pro
           </div>
 
           {/* ── Transaction ID ── */}
-          {payment.reference ? (
+          {paidPayments.length > 0 ? (
             <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-3">
-              <p className="text-xs text-gray-500 mb-1">Transaction ID on invoice</p>
-              <p className="text-sm font-mono font-medium">{payment.reference}</p>
-              <p className="text-xs text-gray-400 mt-0.5">via {payment.paymentMethod?.toUpperCase() || "UPI"}</p>
+              <p className="text-xs text-gray-500 mb-1">Transactions on invoice</p>
+              <p className="text-sm font-medium">{paidPayments.length} payment(s) mapped</p>
             </div>
           ) : (
             <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3">
               <p className="text-xs text-amber-700 dark:text-amber-400">
-                No transaction ID for this payment. Add it via &ldquo;Mark Paid&rdquo; before generating so it appears on the invoice.
+                No paid payments found. Mark payments as paid first.
               </p>
             </div>
           )}

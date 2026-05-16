@@ -114,7 +114,9 @@ const SCENARIOS: { label: string; tag: string; tagColor: string; description: st
       amountReceived:  7500,
       balanceDue:      7500,
       paymentType:     "upfront",
-      paymentMethod:   "Cash",
+      transactions: [
+        { method: "Cash", reference: "Cash Receipt", date: "16 May 2026", amount: 7500, label: "Upfront" }
+      ],
     },
   },
 ];

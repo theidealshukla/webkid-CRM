@@ -50,9 +50,9 @@ const AMBER  = "#b45309";
 const s = StyleSheet.create({
   page: {
     backgroundColor: WHITE,
-    paddingTop: 48,
-    paddingBottom: 48,
-    paddingHorizontal: 52,
+    paddingTop: 24,
+    paddingBottom: 24,
+    paddingHorizontal: 48,
     fontSize: 9,
     color: DGRAY,
   },
@@ -70,21 +70,21 @@ const s = StyleSheet.create({
   paymentTypeBadge: { marginTop: 6, paddingVertical: 3, paddingHorizontal: 8, borderWidth: 0.5, borderColor: BORDER, borderRadius: 2, alignSelf: "flex-end" },
   paymentTypeText: { fontSize: 7, fontFamily: "Helvetica-Bold", color: MGRAY, letterSpacing: 1, textTransform: "uppercase" },
 
-  divider: { borderBottomWidth: 0.5, borderBottomColor: BORDER, marginVertical: 20 },
+  divider: { borderBottomWidth: 0.5, borderBottomColor: BORDER, marginVertical: 10 },
 
-  billingRow: { flexDirection: "row", backgroundColor: BGRAY, borderRadius: 4, padding: 18 },
+  billingRow: { flexDirection: "row", backgroundColor: BGRAY, borderRadius: 4, padding: 12 },
   billingCol: { flex: 1 },
-  billingColRight: { flex: 1, borderLeftWidth: 0.5, borderLeftColor: BORDER, paddingLeft: 18 },
+  billingColRight: { flex: 1, borderLeftWidth: 0.5, borderLeftColor: BORDER, paddingLeft: 12 },
   billingLabel: { fontSize: 7, fontFamily: "Helvetica-Bold", color: LGRAY, letterSpacing: 1.2, marginBottom: 6, textTransform: "uppercase" },
   billingName: { fontSize: 11, fontFamily: "Helvetica-Bold", color: BLACK, marginBottom: 4 },
   billingText: { fontSize: 8.5, color: MGRAY, lineHeight: 1.6 },
 
-  tableHeaderRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: BLACK, paddingBottom: 6, marginTop: 24 },
+  tableHeaderRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: BLACK, paddingBottom: 6, marginTop: 12 },
   tableHeaderNo:     { width: 28, fontSize: 7.5, fontFamily: "Helvetica-Bold", color: BLACK, letterSpacing: 0.8 },
   tableHeaderDesc:   { flex: 1,   fontSize: 7.5, fontFamily: "Helvetica-Bold", color: BLACK, letterSpacing: 0.8 },
   tableHeaderAmount: { width: 80, fontSize: 7.5, fontFamily: "Helvetica-Bold", color: BLACK, textAlign: "right", letterSpacing: 0.8 },
 
-  tableRow: { flexDirection: "row", paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: BORDER, alignItems: "flex-start" },
+  tableRow: { flexDirection: "row", paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: BORDER, alignItems: "flex-start" },
   tableNo:     { width: 28, fontSize: 8.5, color: LGRAY },
   tableDesc:   { flex: 1,   fontSize: 9,   color: DGRAY, lineHeight: 1.5 },
   tableAmount: { width: 80, fontSize: 9,   color: DGRAY, textAlign: "right" },
@@ -92,7 +92,7 @@ const s = StyleSheet.create({
   tableDividerRow: { flexDirection: "row", paddingVertical: 6, borderBottomWidth: 0.5, borderBottomColor: BORDER },
   tableDividerText: { flex: 1, fontSize: 7, fontFamily: "Helvetica-Bold", color: LGRAY, letterSpacing: 1 },
 
-  totalsSection: { flexDirection: "row", marginTop: 16, alignItems: "flex-end" },
+  totalsSection: { flexDirection: "row", marginTop: 12, alignItems: "flex-end" },
 
   // Left block — big number
   totalsDueBlock: { flex: 1 },
@@ -115,7 +115,7 @@ const s = StyleSheet.create({
   totalsGrandLabel: { fontSize: 9, fontFamily: "Helvetica-Bold", color: BLACK, letterSpacing: 0.5 },
   totalsGrandValue: { fontSize: 9, fontFamily: "Helvetica-Bold", color: BLACK },
 
-  bottomSection: { flexDirection: "row", marginTop: 32 },
+  bottomSection: { flexDirection: "row", marginTop: 16 },
   paymentInfoBlock: { flex: 1.2 },
   termsBlock: { flex: 1, paddingLeft: 20, borderLeftWidth: 0.5, borderLeftColor: BORDER },
 
@@ -124,17 +124,17 @@ const s = StyleSheet.create({
   paymentKey: { fontFamily: "Helvetica-Bold", color: DGRAY },
   termsText: { fontSize: 7.5, color: MGRAY, lineHeight: 1.7 },
 
-  txnBox: { backgroundColor: BGRAY, borderRadius: 3, padding: "6 8", marginTop: 10 },
-  txnLabel: { fontSize: 7, color: LGRAY, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 3 },
-  txnValue: { fontSize: 9, fontFamily: "Helvetica-Bold", color: BLACK },
+  txnBox: { backgroundColor: BGRAY, borderRadius: 3, padding: 6, marginTop: 6 },
+  txnLabel: { fontSize: 7, color: LGRAY, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 2 },
+  txnValue: { fontSize: 8.5, fontFamily: "Helvetica-Bold", color: BLACK },
 
-  footer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 36, paddingTop: 12, borderTopWidth: 0.5, borderTopColor: BORDER },
+  footer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 16, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: BORDER },
   footerLeft: { fontSize: 7.5, color: LGRAY },
   footerRight: { fontSize: 7.5, color: LGRAY },
 
-  paidBadge: { position: "absolute", bottom: 108, right: 52, borderWidth: 2, borderColor: GREEN, borderRadius: 3, paddingVertical: 4, paddingHorizontal: 14 },
+  paidBadge: { position: "absolute", bottom: 42, right: 48, borderWidth: 2, borderColor: GREEN, borderRadius: 3, paddingVertical: 4, paddingHorizontal: 14 },
   paidText: { fontSize: 9, fontFamily: "Helvetica-Bold", color: GREEN, letterSpacing: 2 },
-  partialBadge: { position: "absolute", bottom: 108, right: 52, borderWidth: 2, borderColor: AMBER, borderRadius: 3, paddingVertical: 4, paddingHorizontal: 14 },
+  partialBadge: { position: "absolute", bottom: 42, right: 48, borderWidth: 2, borderColor: AMBER, borderRadius: 3, paddingVertical: 4, paddingHorizontal: 14 },
   partialText: { fontSize: 9, fontFamily: "Helvetica-Bold", color: AMBER, letterSpacing: 2 },
 });
 
@@ -329,13 +329,15 @@ export function InvoicePDF({ data }: { data: InvoiceData }) {
               <Text style={s.paymentKey}>IFSC:    </Text>{INVOICE_OWNER.bank.ifsc}
             </Text>
 
-            {transactions.map((txn, idx) => (
-              <View key={idx} style={s.txnBox}>
-                <Text style={s.txnLabel}>{txn.label} — {txn.method}</Text>
-                <Text style={s.txnValue}>{txn.reference}</Text>
-                <Text style={[s.txnLabel, { marginTop: 3 }]}>for {fmt(txn.amount)} on {txn.date}</Text>
-              </View>
-            ))}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+              {transactions.map((txn, idx) => (
+                <View key={idx} style={[s.txnBox, { width: "48%", marginTop: 0 }]}>
+                  <Text style={s.txnLabel}>{txn.label} — {txn.method}</Text>
+                  <Text style={s.txnValue}>{txn.reference}</Text>
+                  <Text style={[s.txnLabel, { marginTop: 3 }]}>for {fmt(txn.amount)} on {txn.date}</Text>
+                </View>
+              ))}
+            </View>
           </View>
 
           <View style={s.termsBlock}>
