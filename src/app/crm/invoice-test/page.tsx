@@ -30,9 +30,9 @@ const SCENARIOS: { label: string; tag: string; tagColor: string; description: st
       amountReceived:  5000,
       balanceDue:      5000,
       paymentType:     "upfront",
-      paymentMethod:   "UPI",
-      transactionId:   "UPI123456789",
-      paidDate:        "16 May 2026",
+      transactions: [
+        { method: "UPI", reference: "UPI123456789", date: "16 May 2026", amount: 5000, label: "Upfront" }
+      ],
       notes:           "Includes 2 revision rounds. Delivery in 30 days.",
     },
   },
@@ -58,9 +58,9 @@ const SCENARIOS: { label: string; tag: string; tagColor: string; description: st
       amountReceived:  5000,
       balanceDue:      0,
       paymentType:     "final",
-      paymentMethod:   "Bank Transfer",
-      transactionId:   "SBIN00099887766",
-      paidDate:        "16 May 2026",
+      transactions: [
+        { method: "Bank Transfer", reference: "SBIN00099887766", date: "16 May 2026", amount: 5000, label: "Final" }
+      ],
       notes:           "Project delivered and approved.",
     },
   },
@@ -87,12 +87,11 @@ const SCENARIOS: { label: string; tag: string; tagColor: string; description: st
       projectTotal:    12000,
       previouslyPaid:  5000,
       amountReceived:  7000,
-      extraTotal:      2000,
       balanceDue:      0,
       paymentType:     "final",
-      paymentMethod:   "UPI",
-      transactionId:   "UPI987654321",
-      paidDate:        "16 May 2026",
+      transactions: [
+        { method: "UPI", reference: "UPI987654321", date: "16 May 2026", amount: 7000, label: "Final + Extras" }
+      ],
       notes:           "Includes additional WhatsApp integration and landing page.",
     },
   },
@@ -174,14 +173,7 @@ function ScenarioCard({ scenario }: { scenario: typeof SCENARIOS[0] }) {
             </p>
           </div>
         )}
-        {scenario.data.extraTotal && (
-          <div className="rounded-lg bg-violet-50 dark:bg-violet-950/30 p-2.5">
-            <p className="text-violet-400 mb-0.5">Extra work</p>
-            <p className="font-semibold text-violet-700 dark:text-violet-400">
-              + Rs. {scenario.data.extraTotal.toLocaleString("en-IN")}
-            </p>
-          </div>
-        )}
+
         <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/30 p-2.5">
           <p className="text-emerald-600/70 mb-0.5">This payment</p>
           <p className="font-semibold text-emerald-700 dark:text-emerald-400">

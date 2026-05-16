@@ -11,6 +11,14 @@ export interface InvoiceLineItem {
   amount: number;
 }
 
+export interface InvoiceTransaction {
+  amount: number;
+  method: string;
+  reference: string;
+  date: string;
+  label: string;
+}
+
 export interface InvoiceData {
   invoiceNumber: string;
   issuedDate: string;
@@ -19,16 +27,13 @@ export interface InvoiceData {
   clientEmail?: string;
   projectDescription: string;
   lineItems: InvoiceLineItem[];
-  projectTotal: number;       // total project value (all payments combined)
-  previouslyPaid: number;     // amount paid before this invoice
-  amountReceived: number;     // amount being paid with this invoice
-  extraTotal?: number;
+  projectTotal: number;       // total project value
+  previouslyPaid: number;     // amount paid before this invoice (0 for master)
+  amountReceived: number;     // amount being paid with this invoice (or total paid for master)
   balanceDue: number;         // outstanding after this invoice
-  paymentType: string;        // "upfront" | "final" | raw from db
-  paymentMethod: string;
-  transactionId?: string;
-  paidDate?: string;
+  paymentType: string;        // "upfront" | "final" | "master"
   notes?: string;
+  transactions: InvoiceTransaction[];
 }
 
 const BLACK  = "#000000";
@@ -103,7 +108,6 @@ const s = StyleSheet.create({
   totalsLabel: { fontSize: 8.5, color: MGRAY },
   totalsValue: { fontSize: 8.5, color: DGRAY },
   totalsDeductValue: { fontSize: 8.5, color: MGRAY },
-  totalsExtraValue: { fontSize: 8.5, color: EXTRA, fontFamily: "Helvetica-Bold" },
   totalsOutstandingValue: { fontSize: 8.5, color: AMBER, fontFamily: "Helvetica-Bold" },
   totalsPaidValue: { fontSize: 8.5, color: GREEN, fontFamily: "Helvetica-Bold" },
 
@@ -148,12 +152,11 @@ export function InvoicePDF({ data }: { data: InvoiceData }) {
   const {
     invoiceNumber, issuedDate, clientName, clientPhone, clientEmail,
     projectDescription, lineItems, projectTotal, previouslyPaid,
-    amountReceived, extraTotal, balanceDue, paymentType,
-    paymentMethod, transactionId, paidDate, notes,
+    amountReceived, balanceDue, paymentType,
+    notes, transactions
   } = data;
 
   const isFullyPaid = balanceDue === 0;
-  const hasExtra    = (extraTotal ?? 0) > 0;
   const hasPrev     = previouslyPaid > 0;
 
   return (
@@ -265,12 +268,7 @@ export function InvoicePDF({ data }: { data: InvoiceData }) {
               </View>
             )}
 
-            {hasExtra && (
-              <View style={s.totalsRow}>
-                <Text style={s.totalsLabel}>ADDITIONAL WORK:</Text>
-                <Text style={s.totalsExtraValue}>+ {fmt(extraTotal!)}</Text>
-              </View>
-            )}
+
 
             <View style={s.totalsRow}>
               <Text style={s.totalsLabel}>TAX:</Text>
@@ -331,13 +329,13 @@ export function InvoicePDF({ data }: { data: InvoiceData }) {
               <Text style={s.paymentKey}>IFSC:    </Text>{INVOICE_OWNER.bank.ifsc}
             </Text>
 
-            {transactionId && (
-              <View style={s.txnBox}>
-                <Text style={s.txnLabel}>Transaction ID — Received via {paymentMethod}</Text>
-                <Text style={s.txnValue}>{transactionId}</Text>
-                {paidDate && <Text style={[s.txnLabel, { marginTop: 3 }]}>on {paidDate}</Text>}
+            {transactions.map((txn, idx) => (
+              <View key={idx} style={s.txnBox}>
+                <Text style={s.txnLabel}>{txn.label} — {txn.method}</Text>
+                <Text style={s.txnValue}>{txn.reference}</Text>
+                <Text style={[s.txnLabel, { marginTop: 3 }]}>for {fmt(txn.amount)} on {txn.date}</Text>
               </View>
-            )}
+            ))}
           </View>
 
           <View style={s.termsBlock}>

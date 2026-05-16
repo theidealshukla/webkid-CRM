@@ -62,11 +62,10 @@ const EMPTY_EDIT: EditState = {
   becameClientAt: "", projectStartedAt: "", projectDeliveredAt: "",
 };
 
-function PaymentBadge({ payment, onMark, onUnmark, onInvoice }: {
+function PaymentBadge({ payment, onMark, onUnmark }: {
   payment: Payment;
   onMark: (p: Payment) => void;
   onUnmark: (p: Payment) => void;
-  onInvoice: (p: Payment) => void;
 }) {
   const label = payment.type === "upfront" ? "Upfront" : payment.type === "final" ? "Final" : (payment.notes || "Add-on");
   if (payment.status === "paid") {
@@ -77,13 +76,6 @@ function PaymentBadge({ payment, onMark, onUnmark, onInvoice }: {
           {label} paid
         </div>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => onInvoice(payment)}
-            className="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 hover:border-gray-400"
-          >
-            <FileText className="h-2.5 w-2.5" />
-            Invoice
-          </button>
           <button
             onClick={() => onUnmark(payment)}
             className="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 hover:border-red-300"
@@ -129,7 +121,7 @@ export default function ClientsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<EditState>(EMPTY_EDIT);
   const [markingPayment, setMarkingPayment] = useState<Payment | null>(null);
-  const [invoiceModal, setInvoiceModal] = useState<{ payment: Payment; client: Lead } | null>(null);
+  const [invoiceModal, setInvoiceModal] = useState<{ client: Lead } | null>(null);
   const [settingValueId, setSettingValueId] = useState<string | null>(null);
   const [valueInput, setValueInput] = useState("");
   const [editingValueId, setEditingValueId] = useState<string | null>(null);
@@ -450,9 +442,17 @@ export default function ClientsPage() {
                             payment={p} 
                             onMark={setMarkingPayment} 
                             onUnmark={(p) => { if (confirm("Mark this payment as unpaid? All payment details will be cleared.")) markPaymentUnpaid(p.id); }} 
-                            onInvoice={(p) => setInvoiceModal({ payment: p, client: c })} 
                           />
                         ))}
+                        {clientPayments.some(p => p.status === "paid") && (
+                          <button
+                            onClick={() => setInvoiceModal({ client: c })}
+                            className="mt-2 w-full flex justify-center items-center gap-1.5 text-[11px] font-medium text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 rounded py-1.5 hover:bg-violet-100 dark:hover:bg-violet-900/50 transition-colors"
+                          >
+                            <FileText className="h-3 w-3" />
+                            Generate Master Invoice
+                          </button>
+                        )}
                       </div>
                     ) : isSettingValue ? (
                       <div className="space-y-2">
@@ -640,7 +640,6 @@ export default function ClientsPage() {
           open={!!invoiceModal}
           onClose={() => setInvoiceModal(null)}
           client={invoiceModal.client}
-          payment={invoiceModal.payment}
           allPayments={payments.filter(p => p.leadId === invoiceModal.client.id)}
         />
       )}

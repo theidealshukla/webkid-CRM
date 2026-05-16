@@ -36,7 +36,7 @@ interface CRMContextType {
   markPaymentPaid: (paymentId: string, data: { paidDate: string; method: PaymentMethod; reference?: string; notes?: string }) => Promise<void>;
   markPaymentUnpaid: (paymentId: string) => Promise<void>;
   updatePaymentDueDate: (paymentId: string, dueDate: string | null) => Promise<void>;
-  setProjectValue: (leadId: string, value: number) => Promise<void>;
+  setProjectValue: (leadId: string, value: number, addonName?: string) => Promise<void>;
   addPaymentExtras: (paymentId: string, extraAmount: number, newProjectValue: number) => Promise<void>;
   addDirectClient: (data: { businessName: string; phone: string; email?: string; website?: string; services?: string; notes?: string; projectStatus?: string; projectValue?: number; becameClientAt?: string; projectStartedAt?: string; projectDeliveredAt?: string }) => Promise<void>;
   convertToClient: (leadIds: string[], services: string, notes?: string, projectValue?: number) => Promise<void>;
@@ -662,19 +662,48 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     if (data) setPayments(prev => [...prev, ...(data as PaymentRow[]).map(mapPaymentRow)]);
   }, [payments]);
 
-  const markPaymentPaid = useCallback(async (paymentId: string, data: { paidDate: string; method: PaymentMethod; reference?: string; notes?: string }): Promise<void> => {
+  const markPaymentPaid = useCallback(async (paymentId: string, data: { paidDate: string; method: PaymentMethod; reference?: string; notes?: string; amount?: number }): Promise<void> => {
     try {
+      const targetPayment = payments.find(p => p.id === paymentId);
+      if (!targetPayment) return;
+      const leadId = targetPayment.leadId;
+      const lead = leads.find(l => l.id === leadId);
+      const projectValue = lead?.projectValue || 0;
+      
+      const newAmount = data.amount ?? targetPayment.amount;
+
       setPayments(prev => prev.map(p => p.id === paymentId
-        ? { ...p, status: "paid", paidDate: data.paidDate, paymentMethod: data.method, reference: data.reference, notes: data.notes }
+        ? { ...p, status: "paid", amount: newAmount, paidDate: data.paidDate, paymentMethod: data.method, reference: data.reference, notes: data.notes }
         : p));
+        
       const { error } = await supabase.from("payments").update({
         status: "paid",
+        amount: newAmount,
         paid_date: data.paidDate,
         payment_method: data.method || null,
         reference: data.reference || null,
         notes: data.notes || null,
       }).eq("id", paymentId);
       if (error) throw error;
+
+      // Ledger Auto-Correction Engine: Flatten remaining pending payments based on what was actually received.
+      if (projectValue > 0) {
+        const updatedClientPayments = payments.filter(p => p.leadId === leadId).map(p => p.id === paymentId ? { ...p, status: "paid" as any, amount: newAmount } : p);
+        const pendingPayments = updatedClientPayments.filter(p => p.status === "pending");
+        
+        if (pendingPayments.length > 0) {
+          // Dump the difference into the LAST pending payment
+          const targetPending = pendingPayments[pendingPayments.length - 1];
+          const lockedTotal = updatedClientPayments.reduce((sum, p) => p.id === targetPending.id ? sum : sum + p.amount, 0);
+          const nextTargetAmount = Math.max(0, projectValue - lockedTotal);
+
+          if (nextTargetAmount !== targetPending.amount) {
+            await supabase.from("payments").update({ amount: nextTargetAmount }).eq("id", targetPending.id);
+            setPayments(prev => prev.map(p => p.id === targetPending.id ? { ...p, amount: nextTargetAmount } : p));
+          }
+        }
+      }
+
       addLog("Payment Marked Paid", "payment", paymentId);
       toast.success("Payment recorded");
     } catch (e: any) {
@@ -682,7 +711,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
       toast.error("Failed to update payment");
       loadData();
     }
-  }, [loadData, addLog]);
+  }, [payments, leads, loadData, addLog]);
 
   const markPaymentUnpaid = useCallback(async (paymentId: string): Promise<void> => {
     try {
@@ -750,15 +779,15 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
           const upfront = clientPayments.find(p => p.type === "upfront");
           const final   = clientPayments.find(p => p.type === "final");
           
-          const dbUpdates: Promise<{ error: any }>[] = [];
+          const dbUpdates: Promise<any>[] = [];
           const nextAmounts = new Map<string, number>();
 
           if (upfront && final && upfront.status === "pending" && final.status === "pending" && clientPayments.length === 2) {
             // Clean 50/50 split if nothing is paid yet
             const nextUpfront = Math.round(value / 2);
             const nextFinal   = value - nextUpfront;
-            if (nextUpfront !== upfront.amount) { dbUpdates.push(supabase.from("payments").update({ amount: nextUpfront }).eq("id", upfront.id)); nextAmounts.set(upfront.id, nextUpfront); }
-            if (nextFinal !== final.amount) { dbUpdates.push(supabase.from("payments").update({ amount: nextFinal }).eq("id", final.id)); nextAmounts.set(final.id, nextFinal); }
+            if (nextUpfront !== upfront.amount) { dbUpdates.push(supabase.from("payments").update({ amount: nextUpfront }).eq("id", upfront.id) as any); nextAmounts.set(upfront.id, nextUpfront); }
+            if (nextFinal !== final.amount) { dbUpdates.push(supabase.from("payments").update({ amount: nextFinal }).eq("id", final.id) as any); nextAmounts.set(final.id, nextFinal); }
           } else {
             // One or more payments are paid, or we have addons.
             // Freeze paid payments, and dump the remaining balance into the LAST pending payment.
@@ -767,7 +796,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
             const nextTargetAmount = Math.max(0, value - lockedTotal);
 
             if (nextTargetAmount !== targetPayment.amount) {
-              dbUpdates.push(supabase.from("payments").update({ amount: nextTargetAmount }).eq("id", targetPayment.id));
+              dbUpdates.push(supabase.from("payments").update({ amount: nextTargetAmount }).eq("id", targetPayment.id) as any);
               nextAmounts.set(targetPayment.id, nextTargetAmount);
             }
           }

@@ -24,7 +24,7 @@ interface Props {
   /** Total project value used to compute the real payment percentage. If omitted, percentage is not shown. */
   totalProjectValue?: number;
   onClose: () => void;
-  onConfirm: (paymentId: string, data: { paidDate: string; method: PaymentMethod; reference?: string; notes?: string }) => Promise<void>;
+  onConfirm: (paymentId: string, data: { paidDate: string; method: PaymentMethod; reference?: string; notes?: string; amount?: number }) => Promise<void>;
 }
 
 export function MarkPaymentModal({ payment, totalProjectValue, onClose, onConfirm }: Props) {
@@ -32,6 +32,7 @@ export function MarkPaymentModal({ payment, totalProjectValue, onClose, onConfir
   const [method, setMethod] = useState<PaymentMethod>("upi");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
+  const [amountStr, setAmountStr] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -40,6 +41,7 @@ export function MarkPaymentModal({ payment, totalProjectValue, onClose, onConfir
       setMethod("upi");
       setReference("");
       setNotes("");
+      setAmountStr(payment.amount.toString());
     }
   }, [payment]);
 
@@ -47,7 +49,8 @@ export function MarkPaymentModal({ payment, totalProjectValue, onClose, onConfir
     if (!payment) return;
     setSubmitting(true);
     try {
-      await onConfirm(payment.id, { paidDate, method, reference: reference || undefined, notes: notes || undefined });
+      const amt = parseFloat(amountStr) || payment.amount;
+      await onConfirm(payment.id, { paidDate, method, reference: reference || undefined, notes: notes || undefined, amount: amt });
       onClose();
     } finally {
       setSubmitting(false);
@@ -82,6 +85,28 @@ export function MarkPaymentModal({ payment, totalProjectValue, onClose, onConfir
         </DialogHeader>
 
         <div className="space-y-4 py-1">
+          <div className="space-y-1.5">
+            <Label htmlFor="mp-amount">Amount Received (₹)</Label>
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₹</span>
+              <Input
+                id="mp-amount"
+                type="number"
+                placeholder={payment.amount.toString()}
+                value={amountStr}
+                onChange={(e) => setAmountStr(e.target.value)}
+                className="pl-6 font-medium text-emerald-600 dark:text-emerald-400"
+              />
+            </div>
+            {amountStr && parseFloat(amountStr) !== payment.amount && (
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                {parseFloat(amountStr) > payment.amount 
+                  ? "Overpayment detected. The remaining project balance will automatically be reduced."
+                  : "Underpayment detected. The remaining project balance will automatically increase."}
+              </p>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="mp-date">Date Received</Label>
