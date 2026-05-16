@@ -165,7 +165,12 @@ export function GenerateInvoiceModal({ open, onClose, client, allPayments }: Pro
 
       const allLineItems: InvoiceLineItem[] = lineItems;
 
-      const transactions = paidPayments.map(p => ({
+      // Bug 4 fix: compute from allPayments inside the callback so it's never stale
+      const currentPaidPayments = allPayments.filter(p => p.status === "paid");
+      const currentTotalPaid    = currentPaidPayments.reduce((s, p) => s + p.amount, 0);
+      const currentBalanceDue   = Math.max(0, (client.projectValue ?? allPayments.reduce((s, p) => s + p.amount, 0)) - currentTotalPaid);
+
+      const transactions = currentPaidPayments.map(p => ({
         amount: p.amount,
         method: p.paymentMethod === "upi" ? "UPI" : p.paymentMethod === "bank" ? "Bank Transfer" : p.paymentMethod ? p.paymentMethod.charAt(0).toUpperCase() + p.paymentMethod.slice(1) : "UPI",
         reference: p.reference || "N/A",
@@ -182,41 +187,50 @@ export function GenerateInvoiceModal({ open, onClose, client, allPayments }: Pro
         projectDescription:  client.clientServices || "Digital Services",
         lineItems:           allLineItems,
         projectTotal:        effectiveProjectTotal,
-        previouslyPaid:      0, // It's a master invoice, all paid amount is in amountReceived
-        amountReceived:      totalPaid,
-        balanceDue:          newBalanceDue,
+        previouslyPaid:      0,
+        amountReceived:      currentTotalPaid,
+        balanceDue:          currentBalanceDue,
         paymentType:         "master",
         notes:               notes || undefined,
         transactions,
       };
 
-      const blob = await pdf(<InvoicePDF data={invoiceData} />).toBlob();
+      // Bug 1 fix: race against a 30s timeout so the spinner can never hang forever
+      const blob = await Promise.race([
+        pdf(<InvoicePDF data={invoiceData} />).toBlob(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("PDF generation timed out. Please try again.")), 30000)
+        ),
+      ]);
 
-      // Fire-and-forget — user gets the download immediately, DB write happens in background
-      supabase.from("invoices").insert([{
+      // Bug 2 fix: await the insert so the unique invoice_number constraint is committed
+      // before next_invoice_number() can be called again
+      const { error: insertError } = await supabase.from("invoices").insert([{
         invoice_number:  invoiceNumber,
         lead_id:         client.id,
-        payment_id:      null, // Master invoice has no single payment ID
+        payment_id:      null,
         issued_date:     new Date().toISOString().split("T")[0],
         line_items:      allLineItems,
         subtotal:        baseSubtotal,
         total:           baseSubtotal,
-        amount_received: totalPaid,
-        balance_due:     newBalanceDue,
-        status:          newBalanceDue === 0 ? "paid" : "partial",
+        amount_received: currentTotalPaid,
+        balance_due:     currentBalanceDue,
+        status:          currentBalanceDue === 0 ? "paid" : "partial",
         payment_method:  "multiple",
         transaction_id:  "master",
         paid_date:       new Date().toISOString().split("T")[0],
         notes:           notes || null,
         created_by:      user?.id || null,
       }]);
+      if (insertError) console.error("Invoice DB save failed:", insertError);
 
       const url = URL.createObjectURL(blob);
       const a   = document.createElement("a");
       a.href    = url;
       a.download = `${invoiceNumber}-${client.businessName.replace(/\s+/g, "-")}.pdf`;
       a.click();
-      URL.revokeObjectURL(url);
+      // Bug 3 fix: delay revoke so the browser has time to read the blob for download
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
 
       toast.success(`Invoice ${invoiceNumber} downloaded`);
       onClose();
@@ -226,7 +240,7 @@ export function GenerateInvoiceModal({ open, onClose, client, allPayments }: Pro
     } finally {
       setGenerating(false);
     }
-  }, [lineItems, notes, client, totalPaid, effectiveProjectTotal, newBalanceDue, baseSubtotal, user?.id, onClose]);
+  }, [lineItems, notes, client, allPayments, effectiveProjectTotal, baseSubtotal, user?.id, onClose]);
 
   if (!open) return null;
 
