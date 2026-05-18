@@ -11,11 +11,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AddClientModal, type ProjectStatus } from "@/components/crm/AddClientModal";
 import { MarkPaymentModal } from "@/components/crm/MarkPaymentModal";
 import { GenerateInvoiceModal } from "@/components/crm/GenerateInvoiceModal";
+import { PaymentRequestModal } from "@/components/crm/PaymentRequestModal";
 import type { Lead, Payment } from "@/types";
 import {
   Briefcase, Search, MoreHorizontal, Pencil, RotateCcw, Phone, Mail,
   Calendar, Globe, Plus, FileText, IndianRupee, CheckCircle2, Clock,
-  AlertCircle, TrendingUp, Wallet, Banknote, Sparkles, Timer,
+  AlertCircle, TrendingUp, Wallet, Banknote, Sparkles, Timer, Image as ImageIcon,
 } from "lucide-react";
 
 function formatINR(amount: number) {
@@ -62,10 +63,11 @@ const EMPTY_EDIT: EditState = {
   becameClientAt: "", projectStartedAt: "", projectDeliveredAt: "",
 };
 
-function PaymentBadge({ payment, onMark, onUnmark }: {
+function PaymentBadge({ payment, onMark, onUnmark, onRequest }: {
   payment: Payment;
   onMark: (p: Payment) => void;
   onUnmark: (p: Payment) => void;
+  onRequest: (p: Payment) => void;
 }) {
   const label = payment.type === "upfront" ? "Upfront" : payment.type === "final" ? "Final" : (payment.notes || "Add-on");
   if (payment.status === "paid") {
@@ -89,23 +91,41 @@ function PaymentBadge({ payment, onMark, onUnmark }: {
   }
   if (isOverdue(payment)) {
     return (
-      <button
-        onClick={() => onMark(payment)}
-        className="flex items-center gap-1.5 text-[11px] font-semibold text-red-600 dark:text-red-400 hover:underline"
-      >
-        <AlertCircle className="h-3.5 w-3.5" />
-        {label} overdue · Mark paid
-      </button>
+      <div className="flex items-center justify-between gap-2">
+        <button
+          onClick={() => onMark(payment)}
+          className="flex items-center gap-1.5 text-[11px] font-semibold text-red-600 dark:text-red-400 hover:underline"
+        >
+          <AlertCircle className="h-3.5 w-3.5" />
+          {label} overdue · Mark paid
+        </button>
+        <button
+          onClick={() => onRequest(payment)}
+          className="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5"
+          title="Download payment request card"
+        >
+          <ImageIcon className="h-3 w-3" /> Req
+        </button>
+      </div>
     );
   }
   return (
-    <button
-      onClick={() => onMark(payment)}
-      className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400 hover:underline"
-    >
-      <Clock className="h-3.5 w-3.5" />
-      {label} pending · Mark paid
-    </button>
+    <div className="flex items-center justify-between gap-2">
+      <button
+        onClick={() => onMark(payment)}
+        className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400 hover:underline"
+      >
+        <Clock className="h-3.5 w-3.5" />
+        {label} pending · Mark paid
+      </button>
+      <button
+        onClick={() => onRequest(payment)}
+        className="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5"
+        title="Download payment request card"
+      >
+        <ImageIcon className="h-3 w-3" /> Req
+      </button>
+    </div>
   );
 }
 
@@ -121,6 +141,7 @@ export default function ClientsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<EditState>(EMPTY_EDIT);
   const [markingPayment, setMarkingPayment] = useState<Payment | null>(null);
+  const [requestPaymentModal, setRequestPaymentModal] = useState<{ client: Lead, payment: Payment } | null>(null);
   const [invoiceModal, setInvoiceModal] = useState<{ client: Lead } | null>(null);
   const [settingValueId, setSettingValueId] = useState<string | null>(null);
   const [valueInput, setValueInput] = useState("");
@@ -437,11 +458,12 @@ export default function ClientsPage() {
                         )}
                         {/* Payment status rows */}
                         {clientPayments.map(p => (
-                          <PaymentBadge 
-                            key={p.id} 
-                            payment={p} 
-                            onMark={setMarkingPayment} 
-                            onUnmark={(p) => { if (confirm("Mark this payment as unpaid? All payment details will be cleared.")) markPaymentUnpaid(p.id); }} 
+                          <PaymentBadge
+                            key={p.id}
+                            payment={p}
+                            onMark={(payment) => setMarkingPayment(payment)}
+                            onUnmark={(p) => { if (confirm("Mark this payment as unpaid? All payment details will be cleared.")) markPaymentUnpaid(p.id); }}
+                            onRequest={(payment) => setRequestPaymentModal({ client: c, payment })}
                           />
                         ))}
                         {clientPayments.some(p => p.status === "paid") && (
@@ -641,6 +663,15 @@ export default function ClientsPage() {
           onClose={() => setInvoiceModal(null)}
           client={invoiceModal.client}
           allPayments={payments.filter(p => p.leadId === invoiceModal.client.id)}
+        />
+      )}
+
+      {requestPaymentModal && (
+        <PaymentRequestModal
+          open={!!requestPaymentModal}
+          onClose={() => setRequestPaymentModal(null)}
+          client={requestPaymentModal.client}
+          payment={requestPaymentModal.payment}
         />
       )}
     </div>

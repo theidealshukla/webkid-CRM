@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await Promise.race([
         supabase.from("users").select("*").eq("id", id).single(),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Profile fetch timed out")), 5000)
+          setTimeout(() => reject(new Error("Profile fetch timed out")), 10000)
         ),
       ]);
 
@@ -100,14 +100,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let hasResolved = false;
 
     // Bug B fix: absolute safety net — no matter what goes wrong in the async
-    // chain, isLoading clears after 15s so the user is never permanently stuck.
-    // 15s = 2 profile fetch attempts × 5s timeout + 2s sleep between retries + buffer.
+    // chain, isLoading clears after 25s so the user is never permanently stuck.
+    // 25s = 2 profile fetch attempts × 10s timeout + 2s sleep between retries + buffer.
     const maxLoadingTimer = setTimeout(() => {
       if (isMounted.current) {
         console.warn("Auth: max loading time reached, forcing isLoading=false");
         setIsLoading(false);
       }
-    }, 15000);
+    }, 25000);
 
     // 1. Listen to auth state changes immediately to catch events reliably
     try {
@@ -126,22 +126,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (session?.user) {
               const profile = await fetchUserProfileWithRetry(session.user);
               if (profile && isMounted.current) {
+                if (typeof window !== "undefined") {
+                  localStorage.setItem(`crm_role_${profile.id}`, profile.role);
+                }
                 setUser(profile);
                 fetchTeamMembers(); // background, no await
               } else if (isMounted.current) {
                 // Bug C fix: profile fetch failed for an authenticated session.
-                // Use auth metadata as a minimal fallback so the user isn't locked
-                // out by a DB cold-start or transient connectivity issue.
-                // Role defaults to "member" — admin can still reload once DB recovers.
+                // Use auth metadata and localStorage cache as a fallback.
+                const cachedRole = typeof window !== "undefined" ? localStorage.getItem(`crm_role_${session.user.id}`) : null;
                 const fallback: User = {
                   id: session.user.id,
                   email: session.user.email ?? "",
                   name: (session.user.user_metadata?.name as string | undefined)
                     ?? session.user.email?.split("@")[0]
                     ?? "User",
-                  role: "member",
+                  role: (cachedRole === "admin" || cachedRole === "member") ? cachedRole : "member",
                 };
-                console.warn("Auth: profile fetch failed, using auth metadata fallback");
+                console.warn("Auth: profile fetch failed, using auth metadata & cache fallback");
                 setUser(fallback);
                 fetchTeamMembers();
               }
@@ -164,53 +166,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Failed to set up auth listener:", e);
     }
 
-    // 2. Fetch initial session as a guaranteed startup fallback
-    const initSession = async () => {
+    // Safety net: if onAuthStateChange hasn't fired INITIAL_SESSION after 5s,
+    // fall back to getSession() — but only then, to avoid concurrent lock contention.
+    const fallbackTimer = setTimeout(async () => {
+      if (hasResolved || !isMounted.current) return;
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) console.warn("getSession error:", error.message);
-
-        if (!hasResolved && isMounted.current) {
-          hasResolved = true;
-          if (session?.user) {
-            const profile = await fetchUserProfileWithRetry(session.user);
-            if (profile && isMounted.current) {
-              setUser(profile);
-              fetchTeamMembers();
-            } else if (isMounted.current) {
-              // Same fallback as above for the initSession path
-              const fallback: User = {
-                id: session.user.id,
-                email: session.user.email ?? "",
-                name: (session.user.user_metadata?.name as string | undefined)
-                  ?? session.user.email?.split("@")[0]
-                  ?? "User",
-                role: "member",
-              };
-              console.warn("Auth: profile fetch failed in initSession, using fallback");
-              setUser(fallback);
-              fetchTeamMembers();
+        if (error) console.warn("getSession fallback error:", error.message);
+        if (hasResolved || !isMounted.current) return;
+        hasResolved = true;
+        if (session?.user) {
+          const profile = await fetchUserProfileWithRetry(session.user);
+          if (profile && isMounted.current) {
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`crm_role_${profile.id}`, profile.role);
             }
-          } else {
-            if (isMounted.current) setUser(null);
+            setUser(profile);
+            fetchTeamMembers();
+          } else if (isMounted.current) {
+            const cachedRole = typeof window !== "undefined" ? localStorage.getItem(`crm_role_${session.user.id}`) : null;
+            const fallback: User = {
+              id: session.user.id,
+              email: session.user.email ?? "",
+              name: (session.user.user_metadata?.name as string | undefined)
+                ?? session.user.email?.split("@")[0]
+                ?? "User",
+              role: (cachedRole === "admin" || cachedRole === "member") ? cachedRole : "member",
+            };
+            console.warn("Auth: profile fetch failed in fallback, using cache");
+            setUser(fallback);
+            fetchTeamMembers();
           }
-          if (isMounted.current) setIsLoading(false);
+        } else {
+          if (isMounted.current) setUser(null);
         }
+        if (isMounted.current) setIsLoading(false);
       } catch (e) {
-        console.error("Auth init exception:", e);
+        console.error("Auth fallback exception:", e);
         if (!hasResolved && isMounted.current) {
           hasResolved = true;
           setUser(null);
           setIsLoading(false);
         }
       }
-    };
-
-    initSession();
+    }, 5000);
 
     return () => {
       isMounted.current = false;
       clearTimeout(maxLoadingTimer);
+      clearTimeout(fallbackTimer);
       subscription?.unsubscribe();
     };
   }, [fetchUserProfileWithRetry, fetchTeamMembers]);
