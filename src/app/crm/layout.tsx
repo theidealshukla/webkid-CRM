@@ -4,27 +4,16 @@ import { AuthProvider } from "@/context/AuthContext";
 import { CRMProvider } from "@/context/CRMContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAuth } from "@/context/AuthContext";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/context/ThemeContext";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isLoading } = useAuth();
   const pathname = usePathname();
-  const router = useRouter();
   const isLoginPage = pathname === "/crm/login";
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated && !isLoginPage) {
-      router.replace("/crm/login");
-    }
-    if (!isLoading && isAuthenticated && isLoginPage) {
-      router.replace("/crm");
-    }
-  }, [isLoading, isAuthenticated, isLoginPage, router]);
-
-  // Show loading spinner while checking auth
+  // Show loading spinner while checking auth on the client
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -48,11 +37,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // If on login page, render without AppLayout
   if (isLoginPage) {
     return <>{children}</>;
-  }
-
-  // If not authenticated and not on login page, show nothing (redirect is happening)
-  if (!isAuthenticated) {
-    return null;
   }
 
   // Authenticated – render with full CRM layout

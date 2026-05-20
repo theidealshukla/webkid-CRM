@@ -46,13 +46,13 @@ export async function listAll<T>(
 }
 
 export async function insertRow<T>(table: string, row: Partial<T>): Promise<T> {
-  const { data, error } = await supabase.from(table).insert(row).select().single();
+  const { data, error } = await supabase.from(table).insert(row as any).select().single();
   if (error) throw error;
   return data as T;
 }
 
 export async function updateRow<T>(table: string, id: string, patch: Partial<T>): Promise<T> {
-  const { data, error } = await supabase.from(table).update(patch).eq("id", id).select().single();
+  const { data, error } = await supabase.from(table).update(patch as any).eq("id", id).select().single();
   if (error) throw error;
   return data as T;
 }

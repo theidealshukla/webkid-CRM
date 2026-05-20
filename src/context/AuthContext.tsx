@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import type { User } from "@/types";
 import { supabase, clearSupabaseAuth } from "@/config/supabase";
 
@@ -16,30 +16,43 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Simple sleep helper for retry delays
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [teamMembers, setTeamMembers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const isMounted = useRef(true);
 
-  // Fetch the public.users profile for a given auth user id.
-  // Returns null on any DB error — callers must handle null without guessing the role.
-  // The old "member fallback" was removed: assigning role:"member" on a DB timeout
-  // silently downgrades an admin every time Supabase has a slow cold start.
-  const fetchUserProfile = useCallback(async (authUser: any | string): Promise<User | null> => {
+  // Fetch all team members
+  const fetchTeamMembers = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .order("name");
+
+      if (!error && data) {
+        setTeamMembers(
+          data.map((u: { id: string; email: string; name: string; role: string }) => ({
+            id: u.id,
+            email: u.email,
+            name: u.name,
+            role: (u.role || "member") as "admin" | "member",
+          }))
+        );
+      }
+    } catch (e) {
+      console.error("fetchTeamMembers error:", e);
+    }
+  }, []);
+
+  const fetchUserProfile = useCallback(async (authUser: any): Promise<User | null> => {
     const id = typeof authUser === "string" ? authUser : authUser?.id;
     if (!id) return null;
 
     try {
-      // Bug A fix: race against a 5s timeout so a hung Supabase query never
-      // blocks isLoading from clearing (no timeout = spinner stuck forever).
       const { data, error } = await Promise.race([
         supabase.from("users").select("*").eq("id", id).single(),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Profile fetch timed out")), 10000)
+          setTimeout(() => reject(new Error("Profile fetch timed out")), 8000)
         ),
       ]);
 
@@ -59,165 +72,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Fetch profile with one automatic retry (handles Supabase cold-start latency).
-  // Does NOT fall back to a guessed role — returns null if both attempts fail.
-  const fetchUserProfileWithRetry = useCallback(async (authUser: any | string): Promise<User | null> => {
-    let profile = await fetchUserProfile(authUser);
-    if (!profile) {
-      await sleep(2000); // brief pause before retry
-      profile = await fetchUserProfile(authUser);
-    }
-    return profile;
-  }, [fetchUserProfile]);
-
-  // Fetch all team members
-  const fetchTeamMembers = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .order("name");
-
-      if (!error && data && isMounted.current) {
-        setTeamMembers(
-          data.map((u: { id: string; email: string; name: string; role: string }) => ({
-            id: u.id,
-            email: u.email,
-            name: u.name,
-            role: (u.role || "member") as "admin" | "member",
-          }))
-        );
-      }
-    } catch (e) {
-      console.error("fetchTeamMembers error:", e);
-    }
-  }, []);
-
-  // Check existing session on mount
   useEffect(() => {
-    isMounted.current = true;
     let subscription: { unsubscribe: () => void } | null = null;
-    let hasResolved = false;
+    let isMounted = true;
 
-    // Bug B fix: absolute safety net — no matter what goes wrong in the async
-    // chain, isLoading clears after 25s so the user is never permanently stuck.
-    // 25s = 2 profile fetch attempts × 10s timeout + 2s sleep between retries + buffer.
-    const maxLoadingTimer = setTimeout(() => {
-      if (isMounted.current) {
-        console.warn("Auth: max loading time reached, forcing isLoading=false");
-        setIsLoading(false);
-      }
-    }, 25000);
+    const initialize = async () => {
+      try {
+        const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            if (!isMounted) return;
+            console.log(`Auth event: ${event}`);
 
-    // 1. Listen to auth state changes immediately to catch events reliably
-    try {
-      const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          if (!isMounted.current) return;
-          console.log(`Auth event: ${event}`);
-
-          if (event === "TOKEN_REFRESHED") {
-            // JWT was silently renewed — the user's role/profile hasn't changed.
-            // Skip re-fetching: a DB timeout here would cause a role downgrade.
-            hasResolved = true;
-            if (isMounted.current) setIsLoading(false);
-          } else if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
-            hasResolved = true;
-            if (session?.user) {
-              const profile = await fetchUserProfileWithRetry(session.user);
-              if (profile && isMounted.current) {
-                if (typeof window !== "undefined") {
-                  localStorage.setItem(`crm_role_${profile.id}`, profile.role);
-                }
-                setUser(profile);
-                fetchTeamMembers(); // background, no await
-              } else if (isMounted.current) {
-                // Bug C fix: profile fetch failed for an authenticated session.
-                // Use auth metadata and localStorage cache as a fallback.
-                const cachedRole = typeof window !== "undefined" ? localStorage.getItem(`crm_role_${session.user.id}`) : null;
-                const fallback: User = {
-                  id: session.user.id,
-                  email: session.user.email ?? "",
-                  name: (session.user.user_metadata?.name as string | undefined)
-                    ?? session.user.email?.split("@")[0]
-                    ?? "User",
-                  role: (cachedRole === "admin" || cachedRole === "member") ? cachedRole : "member",
-                };
-                console.warn("Auth: profile fetch failed, using auth metadata & cache fallback");
-                setUser(fallback);
-                fetchTeamMembers();
-              }
-            } else if (isMounted.current) {
-              setUser(null);
+            if (event === "TOKEN_REFRESHED") {
+              // Ignore token refreshes to prevent redundant profile fetches.
+              setIsLoading(false);
+              return;
             }
-            if (isMounted.current) setIsLoading(false);
-          } else if (event === "SIGNED_OUT") {
-            hasResolved = true;
-            if (isMounted.current) {
+
+            if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
+              if (session?.user) {
+                const profile = await fetchUserProfile(session.user);
+                if (!isMounted) return;
+                
+                if (profile) {
+                  setUser(profile);
+                  fetchTeamMembers(); // background fetch
+                } else {
+                  console.error("Auth profile fetch failed. Forcing logout.");
+                  setUser(null);
+                  supabase.auth.signOut();
+                }
+              } else {
+                setUser(null);
+              }
+              setIsLoading(false);
+            } else if (event === "SIGNED_OUT") {
               setUser(null);
               setTeamMembers([]);
               setIsLoading(false);
             }
           }
-        }
-      );
-      subscription = sub;
-    } catch (e) {
-      console.error("Failed to set up auth listener:", e);
-    }
-
-    // Safety net: if onAuthStateChange hasn't fired INITIAL_SESSION after 5s,
-    // fall back to getSession() — but only then, to avoid concurrent lock contention.
-    const fallbackTimer = setTimeout(async () => {
-      if (hasResolved || !isMounted.current) return;
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) console.warn("getSession fallback error:", error.message);
-        if (hasResolved || !isMounted.current) return;
-        hasResolved = true;
-        if (session?.user) {
-          const profile = await fetchUserProfileWithRetry(session.user);
-          if (profile && isMounted.current) {
-            if (typeof window !== "undefined") {
-              localStorage.setItem(`crm_role_${profile.id}`, profile.role);
-            }
-            setUser(profile);
-            fetchTeamMembers();
-          } else if (isMounted.current) {
-            const cachedRole = typeof window !== "undefined" ? localStorage.getItem(`crm_role_${session.user.id}`) : null;
-            const fallback: User = {
-              id: session.user.id,
-              email: session.user.email ?? "",
-              name: (session.user.user_metadata?.name as string | undefined)
-                ?? session.user.email?.split("@")[0]
-                ?? "User",
-              role: (cachedRole === "admin" || cachedRole === "member") ? cachedRole : "member",
-            };
-            console.warn("Auth: profile fetch failed in fallback, using cache");
-            setUser(fallback);
-            fetchTeamMembers();
-          }
-        } else {
-          if (isMounted.current) setUser(null);
-        }
-        if (isMounted.current) setIsLoading(false);
+        );
+        subscription = sub;
       } catch (e) {
-        console.error("Auth fallback exception:", e);
-        if (!hasResolved && isMounted.current) {
-          hasResolved = true;
-          setUser(null);
-          setIsLoading(false);
-        }
+        console.error("Failed to set up auth listener:", e);
+        if (isMounted) setIsLoading(false);
       }
-    }, 5000);
+    };
+
+    initialize();
 
     return () => {
-      isMounted.current = false;
-      clearTimeout(maxLoadingTimer);
-      clearTimeout(fallbackTimer);
+      isMounted = false;
       subscription?.unsubscribe();
     };
-  }, [fetchUserProfileWithRetry, fetchTeamMembers]);
+  }, [fetchUserProfile, fetchTeamMembers]);
 
   const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -234,129 +143,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: "Login failed. Please try again." };
       }
 
-      let profile = await fetchUserProfileWithRetry(data.user);
-
-      // Auto-heal missing or disconnected profiles
-      if (!profile) {
-        const { data: profileByEmail } = await supabase
-          .from("users")
-          .select("*")
-          .eq("email", email)
-          .single();
-
-        if (profileByEmail) {
-          // Profile exists with different ID — migrate it
-          const oldId = profileByEmail.id;
-          const newId = data.user.id;
-
-          await Promise.all([
-            supabase.from("leads").update({ assigned_to: newId }).eq("assigned_to", oldId),
-            supabase.from("leads").update({ uploaded_by: newId }).eq("uploaded_by", oldId),
-            supabase.from("activities").update({ user_id: newId }).eq("user_id", oldId),
-            supabase.from("activity_logs").update({ user_id: newId }).eq("user_id", oldId),
-            supabase.from("upload_batches").update({ uploaded_by: newId }).eq("uploaded_by", oldId),
-          ]);
-
-          await supabase.from("users").delete().eq("id", oldId);
-          await supabase.from("users").insert([{
-            id: newId,
-            email: profileByEmail.email,
-            name: profileByEmail.name || email.split("@")[0],
-            role: profileByEmail.role || "member",
-          }]);
-        } else {
-          // No profile at all, create a brand new one
-          await supabase.from("users").insert([{
-            id: data.user.id,
-            email: email,
-            name: email.split("@")[0],
-            role: "member", // default to member; admin must be granted explicitly
-          }]);
-        }
-
-        // Fetch again after self-healing
-        profile = await fetchUserProfileWithRetry(data.user);
-      }
-
+      const profile = await fetchUserProfile(data.user);
+      
       if (profile) {
         setUser(profile);
         await fetchTeamMembers();
         return { success: true };
+      } else {
+        await supabase.auth.signOut();
+        return { success: false, error: "User profile not found. Please contact an admin." };
       }
-
-      return { success: false, error: "Failed to sync user profile. Please contact support." };
     } catch (e: any) {
       console.error("Login error:", e);
       return { success: false, error: e.message || "An unexpected error occurred." };
     }
-  }, [fetchUserProfileWithRetry, fetchTeamMembers]);
+  }, [fetchUserProfile, fetchTeamMembers]);
 
   const signup = useCallback(async (email: string, password: string, name: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      // 1. Create auth user in Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
       });
 
-      if (authError) {
-        return { success: false, error: authError.message };
-      }
-
-      if (!authData.user) {
-        return { success: false, error: "Signup failed. Please try again." };
-      }
+      if (authError) return { success: false, error: authError.message };
+      if (!authData.user) return { success: false, error: "Signup failed. Please try again." };
 
       const newAuthId = authData.user.id;
 
-      // 2. Check if a public.users row already exists with this email
-      const { data: existingUser } = await supabase
+      const { error: profileError } = await supabase
         .from("users")
-        .select("id, name, role")
-        .eq("email", email)
-        .single();
-
-      if (existingUser && existingUser.id !== newAuthId) {
-        // Existing profile found with a different UUID — migrate all FK references
-        const oldId = existingUser.id;
-
-        await Promise.all([
-          supabase.from("leads").update({ assigned_to: newAuthId }).eq("assigned_to", oldId),
-          supabase.from("leads").update({ uploaded_by: newAuthId }).eq("uploaded_by", oldId),
-          supabase.from("activities").update({ user_id: newAuthId }).eq("user_id", oldId),
-          supabase.from("activity_logs").update({ user_id: newAuthId }).eq("user_id", oldId),
-          supabase.from("upload_batches").update({ uploaded_by: newAuthId }).eq("uploaded_by", oldId),
-        ]);
-
-        await supabase.from("users").delete().eq("id", oldId);
-        await supabase.from("users").insert([{
+        .insert([{
           id: newAuthId,
           email,
-          name: name || existingUser.name || "User",
-          role: existingUser.role || "member",
+          name,
+          role: "member",
         }]);
 
-      } else if (!existingUser) {
-        // No existing profile — create a fresh one
-        const { error: profileError } = await supabase
-          .from("users")
-          .insert([{
-            id: newAuthId,
-            email,
-            name,
-            role: "member",
-          }]);
-
-        if (profileError) {
-          console.error("Profile creation error:", profileError);
-          await supabase.auth.signOut();
-          return { success: false, error: "Failed to create user profile. Please try again." };
-        }
+      if (profileError) {
+        console.error("Profile creation error:", profileError);
+        await supabase.auth.signOut();
+        return { success: false, error: "Failed to create user profile. Please try again." };
       }
-      // else: existingUser.id === newAuthId — profile already linked correctly
 
-      // 3. Fetch the profile
-      const profile = await fetchUserProfileWithRetry({ id: newAuthId, email, user_metadata: { name } });
+      const profile = await fetchUserProfile(newAuthId);
       if (profile) {
         setUser(profile);
         await fetchTeamMembers();
@@ -368,7 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Signup error:", e);
       return { success: false, error: e.message || "An unexpected error occurred." };
     }
-  }, [fetchUserProfileWithRetry, fetchTeamMembers]);
+  }, [fetchUserProfile, fetchTeamMembers]);
 
   const logout = useCallback(async () => {
     try {
@@ -376,7 +206,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error("Logout error:", e);
     }
-    // Always clear storage to prevent stale token issues
     clearSupabaseAuth();
     setUser(null);
     setTeamMembers([]);
