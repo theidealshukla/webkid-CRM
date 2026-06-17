@@ -38,6 +38,7 @@ interface CRMContextType {
   updatePaymentDueDate: (paymentId: string, dueDate: string | null) => Promise<void>;
   setProjectValue: (leadId: string, value: number, addonName?: string) => Promise<void>;
   addPaymentExtras: (paymentId: string, extraAmount: number, newProjectValue: number) => Promise<void>;
+  recordInstallment: (leadId: string, data: { amount: number; paidDate: string; method: PaymentMethod; reference?: string; notes?: string }) => Promise<void>;
   addDirectClient: (data: { businessName: string; phone: string; email?: string; website?: string; services?: string; notes?: string; projectStatus?: string; projectValue?: number; becameClientAt?: string; projectStartedAt?: string; projectDeliveredAt?: string }) => Promise<void>;
   convertToClient: (leadIds: string[], services: string, notes?: string, projectValue?: number) => Promise<void>;
   revertToLead: (leadIds: string[]) => Promise<void>;
@@ -822,6 +823,70 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
     }
   }, [payments, loadData, addLog]);
 
+  // Records a partial installment against an outstanding balance.
+  // Inserts a new paid "installment" row and reduces the last pending payment
+  // by the same amount. If the pending payment hits 0, it is deleted.
+  const recordInstallment = useCallback(async (
+    leadId: string,
+    data: { amount: number; paidDate: string; method: PaymentMethod; reference?: string; notes?: string }
+  ): Promise<void> => {
+    if (!data.amount || data.amount <= 0) return;
+    try {
+      const clientPayments = payments.filter(p => p.leadId === leadId);
+      const pendingPayments = clientPayments.filter(p => p.status === "pending");
+      if (pendingPayments.length === 0) return; // Nothing outstanding to record against
+
+      // 1. Insert the new paid installment row
+      const { data: newRow, error: insertErr } = await supabase
+        .from("payments")
+        .insert({
+          lead_id: leadId,
+          type: "installment",
+          amount: data.amount,
+          status: "paid",
+          paid_date: data.paidDate,
+          payment_method: data.method,
+          reference: data.reference || null,
+          notes: data.notes || null,
+        })
+        .select()
+        .single();
+      if (insertErr) throw insertErr;
+
+      // 2. Reduce / eliminate the last pending payment
+      const targetPending = pendingPayments[pendingPayments.length - 1];
+      const newPendingAmount = Math.max(0, targetPending.amount - data.amount);
+
+      if (newPendingAmount === 0) {
+        // Fully covers this installment — delete the pending row
+        await supabase.from("payments").delete().eq("id", targetPending.id);
+        setPayments(prev => [
+          ...prev.filter(p => p.id !== targetPending.id),
+          mapPaymentRow(newRow),
+        ]);
+      } else {
+        // Partially covers — reduce the pending amount
+        const { error: updateErr } = await supabase
+          .from("payments")
+          .update({ amount: newPendingAmount })
+          .eq("id", targetPending.id);
+        if (updateErr) throw updateErr;
+        setPayments(prev => [
+          ...prev
+            .map(p => p.id === targetPending.id ? { ...p, amount: newPendingAmount } : p),
+          mapPaymentRow(newRow),
+        ]);
+      }
+
+      addLog("Recorded Installment", "payment", newRow.id, undefined, { amount: data.amount });
+      toast.success(`Installment of ₹${data.amount.toLocaleString("en-IN")} recorded`);
+    } catch (e: any) {
+      console.error("recordInstallment error:", e);
+      toast.error("Failed to record installment");
+      loadData();
+    }
+  }, [payments, loadData, addLog]);
+
   // Absorbs additional charges (scope additions) into both the client's project
   // value and the specific payment that will collect them. Used when extras
   // are added at invoice-generation time, so the underlying accounting stays
@@ -1113,6 +1178,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         updatePaymentDueDate,
         setProjectValue,
         addPaymentExtras,
+        recordInstallment,
         addDirectClient,
         convertToClient,
         revertToLead,

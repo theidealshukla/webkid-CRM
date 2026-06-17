@@ -1,4 +1,4 @@
-export type PaymentType = "upfront" | "final" | "addon";
+export type PaymentType = "upfront" | "final" | "addon" | "installment";
 export type PaymentStatus = "pending" | "paid";
 export type PaymentMethod = "upi" | "bank" | "cash" | "other";
 

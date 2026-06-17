@@ -12,11 +12,13 @@ import { AddClientModal, type ProjectStatus } from "@/components/crm/AddClientMo
 import { MarkPaymentModal } from "@/components/crm/MarkPaymentModal";
 import { GenerateInvoiceModal } from "@/components/crm/GenerateInvoiceModal";
 import { PaymentRequestModal } from "@/components/crm/PaymentRequestModal";
+import { RecordInstallmentModal } from "@/components/crm/RecordInstallmentModal";
 import type { Lead, Payment } from "@/types";
 import {
   Briefcase, Search, MoreHorizontal, Pencil, RotateCcw, Phone, Mail,
   Calendar, Globe, Plus, FileText, IndianRupee, CheckCircle2, Clock,
   AlertCircle, TrendingUp, Wallet, Banknote, Sparkles, Timer, Image as ImageIcon,
+  SplitSquareVertical,
 } from "lucide-react";
 
 function formatINR(amount: number) {
@@ -69,7 +71,10 @@ function PaymentBadge({ payment, onMark, onUnmark, onRequest }: {
   onUnmark: (p: Payment) => void;
   onRequest: (p: Payment) => void;
 }) {
-  const label = payment.type === "upfront" ? "Upfront" : payment.type === "final" ? "Final" : (payment.notes || "Add-on");
+  const label = payment.type === "upfront" ? "Upfront"
+    : payment.type === "final" ? "Final"
+    : payment.type === "installment" ? "Installment"
+    : (payment.notes || "Add-on");
   if (payment.status === "paid") {
     return (
       <div className="flex items-center justify-between gap-2">
@@ -132,7 +137,8 @@ function PaymentBadge({ payment, onMark, onUnmark, onRequest }: {
 export default function ClientsPage() {
   const {
     leads, payments, addDirectClient, revertToLead, updateClientInfo,
-    createPaymentsForClient, markPaymentPaid, markPaymentUnpaid, setProjectValue, isLoadingData,
+    createPaymentsForClient, markPaymentPaid, markPaymentUnpaid, setProjectValue,
+    recordInstallment, isLoadingData,
   } = useCRM();
 
   const clients = useMemo(() => leads.filter(l => l.isClient && !l.isArchived), [leads]);
@@ -143,6 +149,7 @@ export default function ClientsPage() {
   const [markingPayment, setMarkingPayment] = useState<Payment | null>(null);
   const [requestPaymentModal, setRequestPaymentModal] = useState<{ client: Lead, payment: Payment } | null>(null);
   const [invoiceModal, setInvoiceModal] = useState<{ client: Lead } | null>(null);
+  const [installmentModal, setInstallmentModal] = useState<{ client: Lead; remainingBalance: number } | null>(null);
   const [settingValueId, setSettingValueId] = useState<string | null>(null);
   const [valueInput, setValueInput] = useState("");
   const [editingValueId, setEditingValueId] = useState<string | null>(null);
@@ -466,6 +473,24 @@ export default function ClientsPage() {
                             onRequest={(payment) => setRequestPaymentModal({ client: c, payment })}
                           />
                         ))}
+
+                        {/* ── Record Installment button ── */}
+                        {(() => {
+                          const totalPaid = clientPayments.filter(p => p.status === "paid").reduce((s, p) => s + p.amount, 0);
+                          const remaining = clientPayments.filter(p => p.status === "pending").reduce((s, p) => s + p.amount, 0);
+                          if (totalPaid > 0 && remaining > 0) {
+                            return (
+                              <button
+                                onClick={() => setInstallmentModal({ client: c, remainingBalance: remaining })}
+                                className="mt-1 w-full flex justify-center items-center gap-1.5 text-[11px] font-medium text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 rounded py-1.5 hover:bg-violet-100 dark:hover:bg-violet-900/50 transition-colors"
+                              >
+                                <SplitSquareVertical className="h-3 w-3" />
+                                Record Installment · {formatINR(remaining)} outstanding
+                              </button>
+                            );
+                          }
+                          return null;
+                        })()}
                         {clientPayments.some(p => p.status === "paid") && (
                           <button
                             onClick={() => setInvoiceModal({ client: c })}
@@ -663,6 +688,18 @@ export default function ClientsPage() {
           onClose={() => setInvoiceModal(null)}
           client={invoiceModal.client}
           allPayments={payments.filter(p => p.leadId === invoiceModal.client.id)}
+        />
+      )}
+
+      {installmentModal && (
+        <RecordInstallmentModal
+          open={!!installmentModal}
+          onClose={() => setInstallmentModal(null)}
+          clientName={installmentModal.client.businessName}
+          remainingBalance={installmentModal.remainingBalance}
+          onConfirm={async (data) => {
+            await recordInstallment(installmentModal.client.id, data);
+          }}
         />
       )}
 

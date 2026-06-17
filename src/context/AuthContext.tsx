@@ -48,33 +48,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const id = typeof authUser === "string" ? authUser : authUser?.id;
     if (!id) return null;
 
-    try {
-      const { data, error } = await Promise.race([
-        supabase.from("users").select("*").eq("id", id).single(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Profile fetch timed out")), 8000)
-        ),
-      ]);
+    // Retry up to 2 times before giving up (handles transient network blips)
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const { data, error } = await Promise.race([
+          supabase.from("users").select("*").eq("id", id).single(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Profile fetch timed out")), 10000)
+          ),
+        ]);
 
-      if (error || !data) {
-        throw new Error("Profile fetch issue: " + (error?.message || "No data"));
+        if (error) throw new Error("Profile fetch issue: " + error.message);
+        if (!data) throw new Error("Profile fetch issue: No data");
+
+        return {
+          id: data.id,
+          email: data.email,
+          name: data.name,
+          role: data.role || "member",
+        };
+      } catch (e) {
+        console.error(`fetchUserProfile error (attempt ${attempt}):`, e);
+        if (attempt < 2) {
+          // Brief pause before retry
+          await new Promise(r => setTimeout(r, 1500));
+        }
       }
-
-      return {
-        id: data.id,
-        email: data.email,
-        name: data.name,
-        role: data.role || "member",
-      };
-    } catch (e) {
-      console.error("fetchUserProfile error:", e);
-      return null;
     }
+    return null;
   }, []);
 
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | null = null;
     let isMounted = true;
+    // Debounce flag: prevents duplicate SIGNED_IN / INITIAL_SESSION events
+    // (HMR, token refresh, and Supabase realtime can fire these in rapid succession)
+    let handlingAuth = false;
 
     const initialize = async () => {
       try {
@@ -84,29 +93,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log(`Auth event: ${event}`);
 
             if (event === "TOKEN_REFRESHED") {
-              // Ignore token refreshes to prevent redundant profile fetches.
+              // Ignore token refreshes — the session is still valid.
               setIsLoading(false);
               return;
             }
 
             if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
-              if (session?.user) {
-                const profile = await fetchUserProfile(session.user);
-                if (!isMounted) return;
-                
-                if (profile) {
-                  setUser(profile);
-                  fetchTeamMembers(); // background fetch
+              // Guard against concurrent handling of duplicate events
+              if (handlingAuth) return;
+              handlingAuth = true;
+
+              try {
+                if (session?.user) {
+                  const profile = await fetchUserProfile(session.user);
+                  if (!isMounted) return;
+
+                  if (profile) {
+                    setUser(profile);
+                    fetchTeamMembers(); // background fetch, non-blocking
+                  } else {
+                    // Profile truly not found after retries — only log out if we
+                    // have no existing user state (don't evict an already-working session)
+                    console.error("Auth profile fetch failed after retries.");
+                    setUser(prev => {
+                      if (prev) {
+                        // Keep the existing user rather than forcing a logout on a
+                        // transient Supabase hiccup
+                        console.warn("Keeping existing user session due to profile fetch failure.");
+                        return prev;
+                      }
+                      // No existing user — safe to sign out
+                      supabase.auth.signOut();
+                      return null;
+                    });
+                  }
                 } else {
-                  console.error("Auth profile fetch failed. Forcing logout.");
                   setUser(null);
-                  supabase.auth.signOut();
                 }
-              } else {
-                setUser(null);
+              } finally {
+                if (isMounted) setIsLoading(false);
+                // Release the lock after a short delay to swallow any immediate
+                // duplicate events from the same auth action
+                setTimeout(() => { handlingAuth = false; }, 2000);
               }
-              setIsLoading(false);
             } else if (event === "SIGNED_OUT") {
+              handlingAuth = false;
               setUser(null);
               setTeamMembers([]);
               setIsLoading(false);

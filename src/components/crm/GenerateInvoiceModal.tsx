@@ -175,7 +175,7 @@ export function GenerateInvoiceModal({ open, onClose, client, allPayments }: Pro
         method: p.paymentMethod === "upi" ? "UPI" : p.paymentMethod === "bank" ? "Bank Transfer" : p.paymentMethod ? p.paymentMethod.charAt(0).toUpperCase() + p.paymentMethod.slice(1) : "UPI",
         reference: p.reference || "N/A",
         date: p.paidDate ? formatDate(p.paidDate) : "Unknown",
-        label: p.type === "upfront" ? "Upfront" : p.type === "final" ? "Final" : (p.notes || "Add-on")
+        label: p.type === "upfront" ? "Upfront" : p.type === "final" ? "Final" : p.type === "installment" ? "Installment" : (p.notes || "Add-on")
       }));
 
       const invoiceData: InvoiceData = {
