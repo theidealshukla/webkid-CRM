@@ -3,7 +3,7 @@
 export const INVOICE_OWNER = {
   brandName: "Webkid",
   ownerName: "Adarsh Kumar Shukla",
-  email: "getstarted@webkid.me",
+  email: "adarshshuklawork@gmail.com",
   website: "webkid.me",
   upiId: "adarshshukla783@ibl",
   bank: {
